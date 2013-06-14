@@ -5,6 +5,7 @@ import stomp
 import sys
 import datetime
 from os import path
+from messagewritter import MessageWritter
 
 class TopicListener(stomp.ConnectionListener):
     
@@ -14,35 +15,11 @@ class TopicListener(stomp.ConnectionListener):
         self.connectedCounter = 100
         # topic
 	self.topic = None
-	# log file
-	self.fileDirectory = ''
-	self.filenamePrefix = ''
-	self.fileFields = []
-        self.fileHeader = ''
-        self.fileFieldHeader = ''
-        self.fileFieldFormat = ''
-        self.fileFieldNotAvaliable = ''
-        self.fileFieldFooter = ''
-        self.fileFooter = ''
-	self.fileLogPastDays = 0
-	self.fileLogFutureDays = 0
-	self.errorLogFilenamePrefix = ''
-	self.errorLogFaultyTimestamps = 0
 	# output
 	self.debugOutput = 0 
-        # date format
-        self.dateFormat = '%Y-%m-%dT%H:%M:%SZ'
-
-    def createLogFilename(self, timestamp):
-        if self.fileDirectory[-1] != '/':
-            self.fileDirectory = self.fileDirectory + '/'
-        return self.fileDirectory + self.filenamePrefix % timestamp
-
-    def createErrorLogFilename(self, timestamp):
-        if self.fileDirectory[-1] != '/':
-            self.fileDirectory = self.fileDirectory + '/'
-        return self.fileDirectory + self.errorLogFilenamePrefix % timestamp
-
+        # meassage writter
+        self.messageWritter = None;
+    
     def createLogEntry(self, msg):
 	return datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S') + ' --> ' + msg + '\n'
 
@@ -78,54 +55,10 @@ class TopicListener(stomp.ConnectionListener):
             sys.stdout.write(self.createLogEntry('-' * 20))
             sys.stdout.write('Message:\n %s' % message)
             sys.stdout.flush()
-
-        msgTime = datetime.datetime.strptime(fields['timestamp'], self.dateFormat).date();
-        nowTime = datetime.datetime.utcnow().date()
-
-	timeDiff = nowTime - msgTime;
-     
-        if self.debugOutput:
-            sys.stdout.write('Msg time: %r\n' % msgTime)
-            sys.stdout.write('Now: %r\n' % nowTime)
-            sys.stdout.write('Diff time: %r\n' % timeDiff)
-            sys.stdout.flush()	
-
-        msgOk = False
-        if timeDiff.days == 0:
-            msgOk = True
-        elif timeDiff.days > 0 and timeDiff.days <= self.fileLogFutureDays:
-            msgOk = True
-        elif timeDiff.days < 0 and -timeDiff.days <= self.fileLogFutureDays:
-            msgOk = True
-        
-        logMsg = False    
-        if msgOk:
-            filename = self.createLogFilename(fields['timestamp'][:10])
-            logMsg = True
-        elif self.errorLogFaultyTimestamps:
-            filename = self.createErrorLogFilename(fields['timestamp'][:10])
-            logMsg = True
-
-        if logMsg:
-	    addFileHeader = not path.exists(filename)
-            msgFile = open(filename, 'a')
-
-            if addFileHeader:
-                msgFile.write(self.fileHeader)
 	
-            msgFile.write(self.fileFieldHeader)
-            for field in self.fileFields:
-                if field in fields:
-                    msgFile.write(self.fileFieldFormat % fields[field])
-                else:
-                    msgFile.write(self.fileFieldFormat % self.fileFieldNotAvaliable)
-            msgFile.write(self.fileFieldFooter)
-
-            msgFile.close();
+        if self.messageWritter is not None:
+	    self.messageWritter.writeMessage(fields);
 
         if self.debugOutput:
-            if logMsg:
-                sys.stdout.write('msg added to file\n\n')
-            else:
-                sys.stdout.write('msg NOT added to file\n\n')
+            sys.stdout.write('msg sent to writter\n\n')
             sys.stdout.flush()

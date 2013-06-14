@@ -7,6 +7,7 @@ import stomp
 import logging
 from daemon import Daemon
 from topiclistener import TopicListener
+from messagefilewritter import MessageFileWritter
 
 # topis deamon defaults
 defaultMsgServer = 'msg.cro-ngi.hr'
@@ -19,19 +20,8 @@ defaultDaemonStdErr = os.path.dirname(os.path.abspath(__file__)) + '/std.err'
 defaultDaemonName = 'topicdaemon'
 
 defaultTopic = '/topic/grid.probe.metricOutput.EGEE.ngi.*'
-defaultFileDirectory = os.path.dirname(os.path.abspath(__file__))
-defaultFilenamePrefix = 'log_%s.txt'
-defaultFileFields = ['timestamp', 'metricName', 'serviceType', 'hostName', 'metricStatus', 'voName']
-defaultFileHeader = ''
-defaultFileFieldHeader = ''
-defaultFileFieldFormat = '%s\001'
-defaultFileFieldNotAvaliable = ''
-defaultFileFieldFooter = '\n'
-defaultFileFooter = ''
-defaultFileLogPastDays = 1
-defaultFileLogFutureDays = 0
-defaultErrorLogFilenamePrefix = 'error_log_%s.txt'
-defualtErrorLogFaultyTimestamps = 0
+
+defaultMessageWritterConfig = os.path.dirname(os.path.abspath(__file__)) + '/messagewritter.conf'
 
 defaultDebugOutput = 0
 
@@ -80,57 +70,11 @@ class TopicDaemon(Daemon):
             	else:
                 	listener.topic = defaultTopic
  
-		if 'fileDirectory' in configFields:
-                        listener.fileDirectory = configFields['fileDirectory']
+		if 'messageWritterConfig' in configFields:
+                        messageWritterConfig = configFields['messageWritterConfig']
                 else:
-                        listener.fileDirectory = defaultFileDirectory
+                        messageWritterConfig = defaultMessageWritterConfig
 		
-		if 'filenamePrefix' in configFields:
-                        listener.filenamePrefix = configFields['filenamePrefix']
-                else:
-                        listener.filenamePrefix = defaultFilenamePrefix
-
-		if 'fileFields' in configFields:
-                        listener.fileFields = configFields['fileFields'].split(';')
-                else:
-                        listener.fileFields = defaultFileFields
-
-		if 'fileHeader' in configFields:
-                        listener.fileHeader = configFields['fileHeader']
-                else:
-                        listener.fileHeader = defaultFileHeader
-
-		if 'fileFieldHeader' in configFields:
-                        listener.fileFieldHeader = configFields['fileFieldHeader']
-                else:
-                        listener.fileFieldHeader = defaultFileFieldHeader
-
-		if 'fileFieldFormat' in configFields:
-                        listener.fileFieldFormat = configFields['fileFieldFormat']
-                else:
-                        listener.fileFieldFormat = defaultFileFieldFormat
-
-		if 'fileFieldNotAvaliable' in configFields:
-                        listener.fileFieldNotAvaliable = configFields['fileFieldNotAvaliable']
-                else:
-                        listener.fileFieldNotAvaliable = defaultFileFieldNotAvaliable
-
-		if 'fileFieldFooter' in configFields:
-                        listener.fileFieldFooter = configFields['fileFieldFooter']
-                else:
-                        listener.fileFieldFooter = defaultFileFieldFooter
-
-		if 'fileFooter' in configFields:
-                        listener.fileFooter = configFields['fileFooter']
-                else:
-                        listener.fileFooter = defaultFileFooter
-
-                if 'debugOutput' in configFields:
-                        listener.debugOutput = configFields['debugOutput']
-                else:
-                        listener.debugOutput = defaultDebugOutput
-
-
                 # sys.stdout.write("Config fields:\n%r\n" % configFields)
                 # sys.stdout.flush()
 
@@ -140,25 +84,40 @@ class TopicDaemon(Daemon):
                         msgServer = configFields['msgServer']
 		msgServerPort = defaultMsgServerPort
 		if 'msgServerPort' in configFields:
-                        msgServerPort = int(configFields['msgServerPort'])		
-
+                        msgServerPort = int(configFields['msgServerPort'])
+		messageWritterConfig = defaultMessageWritterConfig
+		if 'messageWritterConfig' in configFields:
+                        messageWritterConfig = configFields['messageWritterConfig']
+	
 		conn = stomp.Connection([(msgServer,msgServerPort)])
 
+		# message writter
+		msgWritter = MessageFileWritter()
+		msgWritter.loadConfig(messageWritterConfig)
+		listener.messageWritter = msgWritter
+
 		# loop
+		retryCount = 0
+                listener.connectedCounter = 0
 		while True:
 			if not listener.connected:
 				listener.connectedCounter -= 1
 				if listener.connectedCounter <= 0:
-					# remove listeners
-					# conn.remove_listener('topiclistener')
-
+					
 					# start connection
 					conn.set_listener('topiclistener', listener)
-                			conn.start()
-                			conn.connect()				
-					conn.subscribe(destination=listener.topic, ack='auto')
-	
-                                        listener.connectedCounter = 100
+					try:
+                				conn.start()
+                				conn.connect()				
+						conn.subscribe(destination=listener.topic, ack='auto')
+						retryCount = 0
+						listener.connectedCounter = 100
+					except:
+						retryCount += 1
+						if retryCount < 10:
+							listener.connectedCounter = retryCount * 10
+						else:
+							listener.connectedCounter = 100
 			time.sleep(1)
 		
 		sys.stdout.write("%s ended\n" % self.name)
