@@ -149,7 +149,7 @@ class MessageFileWritter(MessageWritter):
         	msgOk = False
         	if timeDiff.days == 0:
 			msgOk = True
-		elif timeDiff.days > 0 and timeDiff.days <= self.fileLogFutureDays:
+		elif timeDiff.days > 0 and timeDiff.days <= self.fileLogPastDays:
 			msgOk = True
 		elif timeDiff.days < 0 and -timeDiff.days <= self.fileLogFutureDays:
 			msgOk = True
