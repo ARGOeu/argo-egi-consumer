@@ -19,7 +19,7 @@ defaultDaemonStdOut = os.path.dirname(os.path.abspath(__file__)) + '/std.out'
 defaultDaemonStdErr = os.path.dirname(os.path.abspath(__file__)) + '/std.err'
 defaultDaemonName = 'topicdaemon'
 
-defaultTopic = '/topic/grid.probe.metricOutput.EGEE.ngi.*'
+defaultTopics = '/topic/grid.probe.metricOutput.EGEE.ngi.*'
 
 defaultMessageWritterConfig = os.path.dirname(os.path.abspath(__file__)) + '/messagewritter.conf'
 
@@ -65,10 +65,10 @@ class TopicDaemon(Daemon):
                 listener = TopicListener()
 
 		#apply config
-		if 'topic' in configFields:
-                	listener.topic = configFields['topic']
+		if 'topics' in configFields:
+                	listener.topics = configFields['topics'].split(';')
             	else:
-                	listener.topic = defaultTopic
+                	listener.topics = defaultTopics.split(';')
  
 		if 'messageWritterConfig' in configFields:
                         messageWritterConfig = configFields['messageWritterConfig']
@@ -88,7 +88,10 @@ class TopicDaemon(Daemon):
 		messageWritterConfig = defaultMessageWritterConfig
 		if 'messageWritterConfig' in configFields:
                         messageWritterConfig = configFields['messageWritterConfig']
-	
+		debugOutput = defaultDebugOutput
+                if 'debugOutput' in configFields:
+                        debugOutput = configFields['debugOutput']
+		
 		conn = stomp.Connection([(msgServer,msgServerPort)])
 
 		# message writter
@@ -99,6 +102,7 @@ class TopicDaemon(Daemon):
 		# loop
 		retryCount = 0
                 listener.connectedCounter = 0
+		listener.debugOutput = debugOutput
 		while True:
 			if not listener.connected:
 				listener.connectedCounter -= 1
@@ -108,8 +112,9 @@ class TopicDaemon(Daemon):
 					conn.set_listener('topiclistener', listener)
 					try:
                 				conn.start()
-                				conn.connect()				
-						conn.subscribe(destination=listener.topic, ack='auto')
+                				conn.connect()
+						for topic in listener.topics: 			
+							conn.subscribe(destination=topic, ack='auto')
 						retryCount = 0
 						listener.connectedCounter = 100
 					except:

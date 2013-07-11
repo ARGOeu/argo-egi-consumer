@@ -44,6 +44,11 @@ class TopicListener(stomp.ConnectionListener):
     def on_message(self, headers, message):
         lines = message.split('\n')
         fields = dict()
+	
+	#header fields
+	fields.update(headers)
+
+	# body fields
         for line in lines:
             splitLine = line.split(': ')
             if len(splitLine) > 1:
@@ -53,7 +58,8 @@ class TopicListener(stomp.ConnectionListener):
 
 	if self.debugOutput:
             sys.stdout.write(self.createLogEntry('-' * 20))
-            sys.stdout.write('Message:\n %s' % message)
+            sys.stdout.write('Message Header:\n %s' % headers)
+            sys.stdout.write('Message Body:\n %s' % message)
             sys.stdout.flush()
 	
         if self.messageWritter is not None:

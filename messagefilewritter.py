@@ -169,16 +169,41 @@ class MessageFileWritter(MessageWritter):
 			if addFileHeader:
                 		msgFile.write(self.fileHeader)
 
-			msgFile.write(self.fileFieldHeader)
+			# lines
+			# msgFile.write(self.fileFieldHeader)
+			lines = [self.fileFieldHeader]
+
 			for field in self.fileFields:
 				if field in fields:
-					msgFile.write(self.fileFieldFormat % fields[field])
+					fieldSplit = fields[field]
+					# need to split ?
+					if ',' in fieldSplit:
+						newLines = list();
+						fieldSplit = fieldSplit.split(',')				
+						# offset = 0
+						for split in fieldSplit:
+							#new lines
+							for idx in range(0,len(lines)):
+								newLines.append(lines[idx] + (self.fileFieldFormat % split))
+							# offset += len(lines)
+						lines = newLines
+					else:
+						for idx in range(0,len(lines)):
+                                                	lines[idx] = lines[idx] + (self.fileFieldFormat % fieldSplit)
+					# msgFile.write(self.fileFieldFormat % fields[field])
 				else:
-					msgFile.write(self.fileFieldFormat % self.fileFieldNotAvaliable)
-			msgFile.write(self.fileFieldFooter)
+					for idx in range(0,len(lines)):
+						lines[idx] = lines[idx] + (self.fileFieldFormat % self.fileFieldNotAvaliable)
+					# msgFile.write(self.fileFieldFormat % self.fileFieldNotAvaliable)
+
+			for idx in range(0,len(lines)):
+				lines[idx] = lines[idx] + (self.fileFieldFooter)
+			# msgFile.write(self.fileFieldFooter)
+
+			for line in lines:
+                                msgFile.write(line)
 
 			msgFile.close();	
-
 
 
 	def createLogFilename(self, timestamp):
