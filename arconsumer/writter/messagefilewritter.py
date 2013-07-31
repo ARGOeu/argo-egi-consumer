@@ -8,8 +8,8 @@ import os
 from os import path
 from messagewritter import MessageWritter
 
-defaultFileDirectory = os.path.dirname(os.path.abspath(__file__))
-defaultFilenamePrefix = 'log_%s.txt'
+defaultFileDirectory = '/var/lib/ar-consumer'
+defaultFilenamePrefix = 'ar-consumer_log_%s.txt'
 defaultFileFields = ['timestamp', 'metricName', 'serviceType', 'hostName', 'metricStatus', 'voName']
 defaultFileHeader = ''
 defaultFileFieldHeader = ''
@@ -19,7 +19,7 @@ defaultFileFieldFooter = '\n'
 defaultFileFooter = ''
 defaultFileLogPastDays = 1
 defaultFileLogFutureDays = 0
-defaultErrorLogFilenamePrefix = 'error_log_%s.txt'
+defaultErrorLogFilenamePrefix = 'ar-consumer_error_%s.txt'
 defaultErrorLogFaultyTimestamps = 0
 
 class MessageFileWritter(MessageWritter):

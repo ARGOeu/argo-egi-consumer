@@ -1,0 +1,26 @@
+#!/bin/bash
+# ar-consumer daemon
+# chkconfig: 345 20 80
+# description: ar-consumer daemon
+# processname: ar-consumer
+
+DAEMON_PATH="/usr/bin/ar-consumer"
+
+case "$1" in
+start)
+	`$DAEMON_PATH start`
+;;
+status)
+	`$DAEMON_PATH status`
+;;
+stop)
+	`$DAEMON_PATH stop`
+;;
+restart)
+        `$DAEMON_PATH restart`
+;;
+*)
+        echo "Usage: $0 {status|start|stop|restart}"
+        exit 1
+esac
+

@@ -64,6 +64,13 @@ class Daemon:
 	def delpid(self):
 		os.remove(self.pidfile)
 
+	def is_pid_running(self, pid):
+		try:
+			os.kill(pid, 0)
+		except OSError:
+			return False
+		return True
+
 	def start(self):
 		"""
 		Start the daemon
@@ -77,9 +84,12 @@ class Daemon:
 			pid = None
 	
 		if pid:
-			message = "pidfile %s already exist. Daemon already running?\n"
-			sys.stderr.write(message % self.pidfile)
-			sys.exit(1)
+                        if self.is_pid_running(pid):
+				message = "pidfile %s already exist. Daemon already running?\n"
+				sys.stderr.write(message % self.pidfile)
+				sys.exit(1)
+			else:
+				self.delpid
 		
 		# Start the daemon
 		self.daemonize()
@@ -133,11 +143,19 @@ class Daemon:
                         pid = None
 		
 		if pid:
-                        message = "%s (pid  %d) is running...\n"
-                        sys.stdout.write(message % (self.name, pid))
+			if self.is_pid_running(pid):			
+                        	message = "%s (pid  %d) is running...\n"
+                        	sys.stdout.write(message % (self.name, pid))
+				return 0
+			else:
+				message = "%s is stopped.\n"
+                        	sys.stdout.write(message % self.name)
+                        	return 3
+
 		else:
-			message = "%s is stoped.\n"
+			message = "%s is stopped.\n"
                         sys.stdout.write(message % self.name)
+                        return 3
 
 	def run(self):
 		"""

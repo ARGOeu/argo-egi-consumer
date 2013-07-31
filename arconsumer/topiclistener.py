@@ -5,7 +5,7 @@ import stomp
 import sys
 import datetime
 from os import path
-from messagewritter import MessageWritter
+from writter import MessageWritter
 
 class TopicListener(stomp.ConnectionListener):
     
