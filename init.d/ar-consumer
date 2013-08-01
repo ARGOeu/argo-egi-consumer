@@ -11,17 +11,22 @@ USER="arstats"
 
 case "$1" in
 start)
-	echo -n "Starting $PROG_NAME"
+	echo -n $"Starting $PROG_NAME: "
 	daemon --user $USER $DAEMON_PATH start
+	echo
 ;;
 status)
 	$DAEMON_PATH status
 ;;
 stop)
-	$DAEMON_PATH stop
+	echo -n $"Stopping $PROG_NAME: "
+	daemon --user $USER $DAEMON_PATH stop
+	echo
 ;;
 restart)
-        $DAEMON_PATH restart
+	echo -n $"Restarting $PROG_NAME: "
+        daemon --user $USER $DAEMON_PATH restart
+	echo
 ;;
 *)
         echo "Usage: $0 {status|start|stop|restart}"
