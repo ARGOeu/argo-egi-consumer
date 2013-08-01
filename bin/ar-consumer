@@ -13,7 +13,7 @@ from arconsumer.writter import MessageFileWritter
 defaultMsgServer = 'msg.cro-ngi.hr'
 defaultMsgServerPort = 6163
 defaultDaemonConfigFile = '/etc/ar-consumer/ar-consumer.conf' 
-defaultDaemonPIDFile = '/var/run/ar-consumer.pid'
+defaultDaemonPIDFile = '/var/log/ar-consumer/ar-consumer.pid'
 defaultDaemonStdIn = '/dev/null'
 defaultDaemonStdOut = '/var/log/ar-consumer/ar-consumer.out'
 defaultDaemonStdErr = '/var/log/ar-consumer/ar-consumer.err'

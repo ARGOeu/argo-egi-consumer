@@ -4,20 +4,24 @@
 # description: ar-consumer daemon
 # processname: ar-consumer
 
+. /etc/rc.d/init.d/functions
+PROG_NAME="ar-consumer"
 DAEMON_PATH="/usr/bin/ar-consumer"
+USER="arstats"
 
 case "$1" in
 start)
-	`$DAEMON_PATH start`
+	echo -n "Starting $PROG_NAME"
+	daemon --user $USER $DAEMON_PATH start
 ;;
 status)
-	`$DAEMON_PATH status`
+	$DAEMON_PATH status
 ;;
 stop)
-	`$DAEMON_PATH stop`
+	$DAEMON_PATH stop
 ;;
 restart)
-        `$DAEMON_PATH restart`
+        $DAEMON_PATH restart
 ;;
 *)
         echo "Usage: $0 {status|start|stop|restart}"
