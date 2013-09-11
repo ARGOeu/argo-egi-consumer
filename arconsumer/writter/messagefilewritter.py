@@ -141,18 +141,20 @@ class MessageFileWritter(MessageWritter):
                         self.errorLogFaultyTimestamps = defaultErrorLogFaultyTimestamps
 
 	def writeMessage(self, fields):
-		msgTime = datetime.datetime.strptime(fields['timestamp'], self.dateFormat).date();
-        	nowTime = datetime.datetime.utcnow().date()
 
-        	timeDiff = nowTime - msgTime;
+		msgOk = False	
+		nowTime = datetime.datetime.utcnow().date()
+		msgTime = nowTime
+		if 'timestamp' in fields:
+			msgTime = datetime.datetime.strptime(fields['timestamp'], self.dateFormat).date()
+        		timeDiff = nowTime - msgTime;
 
-        	msgOk = False
-        	if timeDiff.days == 0:
-			msgOk = True
-		elif timeDiff.days > 0 and timeDiff.days <= self.fileLogPastDays:
-			msgOk = True
-		elif timeDiff.days < 0 and -timeDiff.days <= self.fileLogFutureDays:
-			msgOk = True
+       	 		if timeDiff.days == 0:
+				msgOk = True
+			elif timeDiff.days > 0 and timeDiff.days <= self.fileLogPastDays:
+				msgOk = True
+			elif timeDiff.days < 0 and -timeDiff.days <= self.fileLogFutureDays:
+				msgOk = True
 
 		logMsg = False
 		if msgOk:

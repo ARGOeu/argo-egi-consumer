@@ -63,7 +63,10 @@ class TopicListener(stomp.ConnectionListener):
             sys.stdout.flush()
 	
         if self.messageWritter is not None:
-	    self.messageWritter.writeMessage(fields);
+            try:
+	        self.messageWritter.writeMessage(fields);
+            except:
+                self.connected = False
 
         if self.debugOutput:
             sys.stdout.write('msg sent to writter\n\n')
