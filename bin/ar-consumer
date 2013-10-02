@@ -94,11 +94,6 @@ class TopicDaemon(Daemon):
 		
 		conn = stomp.Connection([(msgServer,msgServerPort)])
 
-		# message writter
-		msgWritter = MessageFileWritter()
-		msgWritter.loadConfig(messageWritterConfig)
-		listener.messageWritter = msgWritter
-
 		# loop
 		retryCount = 0
                 listener.connectedCounter = 0
@@ -107,7 +102,12 @@ class TopicDaemon(Daemon):
 			if not listener.connected:
 				listener.connectedCounter -= 1
 				if listener.connectedCounter <= 0:
-					
+				
+					# message writter
+                			msgWritter = MessageFileWritter()
+                			msgWritter.loadConfig(messageWritterConfig)
+                			listener.messageWritter = msgWritter
+	
 					# start connection
 					conn.set_listener('topiclistener', listener)
 					try:

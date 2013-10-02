@@ -66,6 +66,7 @@ class TopicListener(stomp.ConnectionListener):
             try:
 	        self.messageWritter.writeMessage(fields);
             except:
+                self.connectedCounter = -1
                 self.connected = False
 
         if self.debugOutput:
