@@ -19,6 +19,7 @@ class TopicListener(stomp.ConnectionListener):
 	self.debugOutput = 0 
         # meassage writter
         self.messageWritter = None;
+        self.messagesWritten = 0;
     
     def createLogEntry(self, msg):
 	return datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S') + ' --> ' + msg + '\n'
@@ -34,12 +35,13 @@ class TopicListener(stomp.ConnectionListener):
         sys.stdout.flush()
 
     def on_disconnected(self):
-        sys.stderr.write(self.createLogEntry("Listener disconnected"))
-        sys.stderr.flush()
+        sys.stdout.write(self.createLogEntry("Listener disconnected"))
+        sys.stdout.flush()
         self.connected = False
 
     def on_error(self, headers, message):
-	sys.stderr.write(self.createLogEntry("Received error %s" % message))
+	sys.stdout.write(self.createLogEntry("Received error %s" % message))
+        sys.stdout.flush()
 
     def on_message(self, headers, message):
         lines = message.split('\n')
@@ -65,9 +67,12 @@ class TopicListener(stomp.ConnectionListener):
         if self.messageWritter is not None:
             try:
 	        self.messageWritter.writeMessage(fields);
+                self.messagesWritten = self.messagesWritten + 1 
             except:
                 self.connectedCounter = -1
                 self.connected = False
+                sys.stdout.write('--- Error parsing Message ---\nHeaders:\n%s\nBody:\n%s\n---\n' % (headers, message))
+                sys.stdout.flush()
 
         if self.debugOutput:
             sys.stdout.write('msg sent to writter\n\n')
