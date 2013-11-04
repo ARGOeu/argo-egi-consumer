@@ -5,7 +5,7 @@ FILES=Makefile ${SPECFILE}
 PKGVERSION=$(shell grep -s '^Version:' $(SPECFILE) | sed -e 's/Version: *//')
 
 srpm: dist
-	rpmbuild -ts ${PKGNAME}-${PKGVERSION}.tar.gz
+	rpmbuild -ts --define='dist .el6' ${PKGNAME}-${PKGVERSION}.tar.gz
 
 rpm: dist
 	rpmbuild -ta ${PKGNAME}-${PKGVERSION}.tar.gz
