@@ -36,13 +36,14 @@ from arconsumer.writter import MessageFileWritter
 # topis deamon defaults
 defaultMsgServer = 'msg.cro-ngi.hr'
 defaultMsgServerPort = 6163
-defaultDaemonConfigFile = '/etc/ar-consumer/ar-consumer.conf' 
-defaultDaemonPIDFile = '/var/log/ar-consumer/ar-consumer.pid'
+defaultDaemonConfigFile = '/etc/ar-consumer/ar-consumer.conf'
+defaultDaemonPIDFile = '/var/log/ar-consumer/ar-consumer.pid' 
 defaultDaemonStdIn = '/dev/null'
 defaultDaemonStdOut = '/var/log/ar-consumer/ar-consumer.out'
 defaultDaemonStdErr = '/var/log/ar-consumer/ar-consumer.err'
 defaultDaemonName = 'ar-consumer'
-defualtListenerIdleTimeout = 0
+defaultListenerIdleTimeout = 0
+defaultServerReconnectCycle = 1
 
 defaultTopics = '/topic/grid.probe.metricOutput.EGEE.ngi.*'
 
@@ -98,9 +99,9 @@ class TopicDaemon(Daemon):
 		messageWritterConfig = defaultMessageWritterConfig 
 		if 'messageWritterConfig' in configFields:
                         messageWritterConfig = configFields['messageWritterConfig']
-		msgServer = defaultMsgServer
-		if 'msgServer' in configFields:
-                        msgServer = configFields['msgServer']
+		msgServers = defaultMsgServer
+		if 'msgServers' in configFields:
+                        msgServers = configFields['msgServers']
 		msgServerPort = defaultMsgServerPort
 		if 'msgServerPort' in configFields:
                         msgServerPort = int(configFields['msgServerPort'])
@@ -110,10 +111,14 @@ class TopicDaemon(Daemon):
 		debugOutput = defaultDebugOutput
                 if 'debugOutput' in configFields:
                         debugOutput = configFields['debugOutput']
-		listenerIdleTimeout = defualtListenerIdleTimeout
+		listenerIdleTimeout = defaultListenerIdleTimeout
 		if 'listenerIdleTimeout' in configFields:
                         listenerIdleTimeout = configFields['listenerIdleTimeout']
-		
+	        serverReconnectCycle = defaultServerReconnectCycle
+                if 'serverReconnectCycle' in configFields:
+                        serverReconnectCycle = configFields['serverReconnectCycle'] 
+               
+	
 	
 		###########################################################
 		# STOMP connection
@@ -132,17 +137,19 @@ class TopicDaemon(Daemon):
 		# 	Max number of reconnect attempts
 		###########################################################
 
-		conn = stomp.Connection([(msgServer,msgServerPort)], keepalive=('linux', 20, 5, 10), reconnect_attempts_max=1000000)
+                msgServerList = msgServers.split(';')
+                msgServer = msgServerList[0]
 
 		# loop
 		retryCount = 0
                 listener.connectedCounter = 0
 		listener.debugOutput = debugOutput
                 loopCount = 0
+                serverReconnect = serverReconnectCycle + 1
 		while True:
 
 			reconnect = False
-			
+		
 			#check connection
 			if not listener.connected:
 				listener.connectedCounter -= 1
@@ -166,15 +173,26 @@ class TopicDaemon(Daemon):
 
                                         loopCount = 0
                                         listener.messagesWritten = 0
-				
 
 			if reconnect:
+                                # cycle msg server
+                                if serverReconnect >= serverReconnectCycle:
+                                        msgServerIdx = msgServerList.index(msgServer)
+                                        msgServerIdx = (msgServerIdx+1) % len(msgServerList)
+                                        msgServer = msgServerList[msgServerIdx]
+                                        conn = stomp.Connection([(msgServer,msgServerPort)], keepalive=('linux', 20, 5, 10), reconnect_attempts_max=10)
+                                        serverReconnect = 0
+                                        retryCount = 0                       
+                                        sys.stdout.write("Cycle to broker: %s\n" % msgServer)
+                                        sys.stdout.flush()
+
 				# message writter
                 		msgWritter = MessageFileWritter()
                 		msgWritter.loadConfig(messageWritterConfig)
                 		listener.messageWritter = msgWritter
 	
 				# start connection
+                                serverReconnect +=1
 				conn.set_listener('topiclistener', listener)
 				try:
 					conn.start()
@@ -188,11 +206,8 @@ class TopicDaemon(Daemon):
 					sys.stdout.flush()
 
 					retryCount += 1
-					if retryCount < 10:
-						listener.connectedCounter = retryCount * 10
-					else:
-						listener.connectedCounter = 100
-			
+					listener.connectedCounter = 10
+                                        	
 			loopCount = loopCount + 1
 			time.sleep(1)
 		
