@@ -3,7 +3,7 @@
 
 Name: ar-consumer
 Summary: A/R Comp Engine message consumer
-Version: 1.1.0
+Version: 1.1.1
 Release: 1%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot
@@ -63,6 +63,8 @@ if [ "$1" = 0 ] ; then
 fi
 
 %changelog
+* Fri Mar 14 2014 Luko Gjenero <lgjenero@srce.hr> - 1.1.1-0%{?dist}
+- SSL broker connection
 * Mon Nov 4 2013 Paschalis Korosoglou <pkoro@grid.auth.gr> - 1.0.1-2%{?dist}
 - Fixes for consumer
 * Thu Oct 3 2013 Paschalis Korosoglou <pkoro@grid.auth.gr> - 1.0.1-1%{?dist}
