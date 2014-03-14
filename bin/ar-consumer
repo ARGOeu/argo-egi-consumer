@@ -48,8 +48,8 @@ defaultTopics = '/topic/grid.probe.metricOutput.EGEE.ngi.*'
 defaultMessageWritterConfig = '/etc/ar-consumer/messagewritter.conf'
 defaultDebugOutput = 0
 defaultUseSSL = 0
-defaultSSLCertificate = '/etc/grid-securuty/hostcert.pem'
-defaultSSLKey = '/etc/grid-securuty/hostkey.pem'
+defaultSSLCertificate = '/etc/grid-security/hostcert.pem'
+defaultSSLKey = '/etc/grid-security/hostkey.pem'
 
 class TopicDaemon(Daemon):
 	def run(self):
