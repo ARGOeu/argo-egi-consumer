@@ -44,12 +44,12 @@ defaultDaemonStdErr = '/var/log/ar-consumer/ar-consumer.err'
 defaultDaemonName = 'ar-consumer'
 defaultListenerIdleTimeout = 0
 defaultServerReconnectCycle = 1
-
 defaultTopics = '/topic/grid.probe.metricOutput.EGEE.ngi.*'
-
 defaultMessageWritterConfig = '/etc/ar-consumer/messagewritter.conf'
-
 defaultDebugOutput = 0
+defaultUseSSL = 0
+defaultSSLCertificate = '/etc/grid-securuty/hostcert.pem'
+defaultSSLKey = '/etc/grid-securuty/hostkey.pem'
 
 class TopicDaemon(Daemon):
 	def run(self):
@@ -117,8 +117,19 @@ class TopicDaemon(Daemon):
 	        serverReconnectCycle = defaultServerReconnectCycle
                 if 'serverReconnectCycle' in configFields:
                         serverReconnectCycle = configFields['serverReconnectCycle'] 
-               
-	
+                
+                # SSL               
+                useSSL = defaultUseSSL == 1
+                if 'useSSL' in configFields:
+                        useSSL = configFields['useSSL'] == 1
+	        SSLCertificate = defaultSSLCertificate
+                if 'SSLCertificate' in configFields:
+                        SSLCertificate = configFields['SSLCertificate']
+                SSLKey = defaultSSLKey
+                if 'SSLKey' in configFields:
+                        SSLKey = configFields['SSLKey']
+
+
 	
 		###########################################################
 		# STOMP connection
@@ -180,7 +191,7 @@ class TopicDaemon(Daemon):
                                         msgServerIdx = msgServerList.index(msgServer)
                                         msgServerIdx = (msgServerIdx+1) % len(msgServerList)
                                         msgServer = msgServerList[msgServerIdx]
-                                        conn = stomp.Connection([(msgServer,msgServerPort)], keepalive=('linux', 20, 5, 10), reconnect_attempts_max=10)
+                                        conn = stomp.Connection([(msgServer,msgServerPort)], keepalive=('linux', 20, 5, 10), reconnect_attempts_max=10, use_ssl=useSSL, ssl_key_file=SSLKey, ssl_cert_file=SSLCertificate)
                                         serverReconnect = 0
                                         retryCount = 0                       
                                         sys.stdout.write("Cycle to broker: %s\n" % msgServer)
