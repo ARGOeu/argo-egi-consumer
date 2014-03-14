@@ -3,7 +3,7 @@
 
 Name: ar-consumer
 Summary: A/R Comp Engine message consumer
-Version: 1.1.0
+Version: 1.1.1
 Release: 1%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot

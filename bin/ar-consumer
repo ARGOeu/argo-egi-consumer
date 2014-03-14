@@ -122,7 +122,7 @@ class TopicDaemon(Daemon):
                 useSSL = defaultUseSSL == 1
                 if 'useSSL' in configFields:
                         useSSL = configFields['useSSL'] == 1
-	        SSLCertificate = defaultSSLCertificate
+                SSLCertificate = defaultSSLCertificate
                 if 'SSLCertificate' in configFields:
                         SSLCertificate = configFields['SSLCertificate']
                 SSLKey = defaultSSLKey
