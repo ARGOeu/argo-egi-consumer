@@ -24,6 +24,7 @@
 # the EGI-InSPIRE project through the European Commission's 7th
 # Framework Programme (contract # INFSO-RI-261323) 
 
+import datetime
 import sys, os, time, atexit
 from signal import SIGTERM 
 
@@ -39,6 +40,9 @@ class Daemon:
 		self.stdout = stdout
 		self.stderr = stderr
 		self.pidfile = pidfile
+
+	def createLogEntry(self, msg):
+		return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + ' ' + msg + '\n'
 	
 	def daemonize(self):
 		"""
@@ -52,7 +56,7 @@ class Daemon:
 				# exit first parent
 				sys.exit(0) 
 		except OSError, e: 
-			sys.stderr.write("fork #1 failed: %d (%s)\n" % (e.errno, e.strerror))
+			sys.stderr.write(self.createLogEntry("fork #1 failed: %d (%s)\n" % (e.errno, e.strerror)))
 			sys.exit(1)
 	
 		# decouple from parent environment
@@ -67,7 +71,7 @@ class Daemon:
 				# exit from second parent
 				sys.exit(0) 
 		except OSError, e: 
-			sys.stderr.write("fork #2 failed: %d (%s)\n" % (e.errno, e.strerror))
+			sys.stderr.write(self.createLogEntry("fork #2 failed: %d (%s)\n" % (e.errno, e.strerror)))
 			sys.exit(1) 
 
 		# redirect standard file descriptors
@@ -110,7 +114,7 @@ class Daemon:
 		if pid:
                         if self.is_pid_running(pid):
 				message = "pidfile %s already exist. Daemon already running?\n"
-				sys.stderr.write(message % self.pidfile)
+				sys.stderr.write(self.createLogEntry(message % self.pidfile))
 				sys.exit(1)
 			else:
 				self.delpid
@@ -133,7 +137,7 @@ class Daemon:
 	
 		if not pid:
 			message = "pidfile %s does not exist. Daemon not running?\n"
-			sys.stderr.write(message % self.pidfile)
+			sys.stderr.write(self.createLogEntry(message % self.pidfile))
 			return # not an error in a restart
 
 		# Try killing the daemon process	
@@ -169,16 +173,16 @@ class Daemon:
 		if pid:
 			if self.is_pid_running(pid):			
                         	message = "%s (pid  %d) is running...\n"
-                        	sys.stdout.write(message % (self.name, pid))
+                        	sys.stdout.write(self.createLogEntry(message % (self.name, pid)))
 				return 0
 			else:
 				message = "%s is stopped.\n"
-                        	sys.stdout.write(message % self.name)
+                        	sys.stdout.write(self.createLogEntry(message % self.name))
                         	return 3
 
 		else:
 			message = "%s is stopped.\n"
-                        sys.stdout.write(message % self.name)
+                        sys.stdout.write(self.createLogEntry(message % self.name))
                         return 3
 
 	def run(self):

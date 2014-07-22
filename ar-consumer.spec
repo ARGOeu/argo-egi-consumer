@@ -3,8 +3,8 @@
 
 Name: ar-consumer
 Summary: A/R Comp Engine message consumer
-Version: 1.1.1
-Release: 2%{?dist}
+Version: 1.2.0
+Release: 1%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot
 Group:     EGI/SA4
@@ -29,6 +29,7 @@ install --directory %{buildroot}/var/lib/ar-consumer
 install --directory %{buildroot}/var/log/ar-consumer
 install --mode 644 etc/ar-consumer/ar-consumer.conf %{buildroot}/etc/ar-consumer/
 install --mode 644 etc/ar-consumer/messagewritter.conf %{buildroot}/etc/ar-consumer/
+install --mode 644 etc/ar-consumer/messagewritter-details.conf %{buildroot}/etc/ar-consumer/
 install --mode 755 init.d/ar-consumer %{buildroot}/etc/init.d
 install --mode 755 bin/ar-consumer %{buildroot}/usr/bin
 %{__cp} -rpf arconsumer %{buildroot}/%{python_sitelib}/
@@ -43,6 +44,7 @@ install --mode 755 bin/ar-consumer %{buildroot}/usr/bin
 %attr(0755,root,root) /etc/init.d/ar-consumer
 %config(noreplace) /etc/ar-consumer/ar-consumer.conf
 %config(noreplace) /etc/ar-consumer/messagewritter.conf
+%config(noreplace) /etc/ar-consumer/messagewritter-details.conf
 %attr(0750,arstats,arstats) /var/lib/ar-consumer
 %attr(0750,arstats,arstats) /var/log/ar-consumer
 %{pylib}
@@ -63,6 +65,10 @@ if [ "$1" = 0 ] ; then
 fi
 
 %changelog
+* Tue Jul 22 2014 Emir Imamagic <eimamagi@srce.hr> - 1.2.0-1%{?dist}
+- Add support for multiple file writters
+- Add detailed probe results to the output
+- Timestamps @ consumer error log file
 * Fri Mar 14 2014 Luko Gjenero <lgjenero@srce.hr> - 1.1.1-0%{?dist}
 - SSL broker connection
 * Mon Nov 4 2013 Paschalis Korosoglou <pkoro@grid.auth.gr> - 1.0.1-2%{?dist}
