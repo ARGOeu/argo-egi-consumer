@@ -43,11 +43,11 @@ class TopicListener(stomp.ConnectionListener):
 	# output
 	self.debugOutput = 0 
         # meassage writter
-        self.messageWritter = None;
+        self.messageWritters = [];
         self.messagesWritten = 0;
     
     def createLogEntry(self, msg):
-	return datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S') + ' --> ' + msg + '\n'
+	return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + ' ' + msg + '\n'
 
     def on_connected(self,headers,body):
         sys.stdout.write(self.createLogEntry("Listener connected: %s\n" % body))
@@ -77,7 +77,7 @@ class TopicListener(stomp.ConnectionListener):
 
 	# body fields
         for line in lines:
-            splitLine = line.split(': ')
+            splitLine = line.split(': ', 1)
             if len(splitLine) > 1:
                 key = splitLine[0]
                 value = splitLine[1]
@@ -89,16 +89,16 @@ class TopicListener(stomp.ConnectionListener):
             sys.stdout.write('Message Body:\n %s' % message)
             sys.stdout.flush()
 	
-        if self.messageWritter is not None:
-            try:
-	        self.messageWritter.writeMessage(fields);
-                self.messagesWritten = self.messagesWritten + 1 
-            except:
-                self.connectedCounter = -1
-                self.connected = False
-                sys.stdout.write('--- Error parsing Message ---\nHeaders:\n%s\nBody:\n%s\n---\n' % (headers, message))
-                sys.stdout.flush()
+        try:
+            for messageWritter in self.messageWritters:
+                messageWritter.writeMessage(fields);
+            self.messagesWritten = self.messagesWritten + 1 
+        except:
+            self.connectedCounter = -1
+            self.connected = False
+            sys.stderr.write(self.createLogEntry('--- Error parsing Message ---\nHeaders:\n%s\nBody:\n%s\n---\n' % (headers, message)))
+            sys.stdout.flush()
 
         if self.debugOutput:
-            sys.stdout.write('msg sent to writter\n\n')
+            sys.stdout.write(self.createLogEntry('msg sent to writter\n\n'))
             sys.stdout.flush()

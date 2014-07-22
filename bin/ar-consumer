@@ -29,6 +29,7 @@ import os
 import time
 import stomp
 import logging
+import datetime
 from arconsumer import Daemon
 from arconsumer import TopicListener
 from arconsumer.writter import MessageFileWritter
@@ -45,16 +46,20 @@ defaultDaemonName = 'ar-consumer'
 defaultListenerIdleTimeout = 0
 defaultServerReconnectCycle = 1
 defaultTopics = '/topic/grid.probe.metricOutput.EGEE.ngi.*'
-defaultMessageWritterConfig = '/etc/ar-consumer/messagewritter.conf'
+defaultMessageWritterConfigs = '/etc/ar-consumer/messagewritter.conf'
 defaultDebugOutput = 0
 defaultUseSSL = 0
 defaultSSLCertificate = '/etc/grid-security/hostcert.pem'
 defaultSSLKey = '/etc/grid-security/hostkey.pem'
 
 class TopicDaemon(Daemon):
+
+	def createLogEntry(self, msg):
+		return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + ' ' + msg + '\n'
+
 	def run(self):
 		
-		logging.basicConfig()
+		logging.basicConfig(format='%(asctime)s %(message)s')
 	
 		#load config
 		configFile = None
@@ -95,19 +100,16 @@ class TopicDaemon(Daemon):
                 	listener.topics = configFields['topics'].split(';')
             	else:
                 	listener.topics = defaultTopics.split(';')
-
-		messageWritterConfig = defaultMessageWritterConfig 
-		if 'messageWritterConfig' in configFields:
-                        messageWritterConfig = configFields['messageWritterConfig']
+		if 'messageWritterConfigs' in configFields:
+                        messageWritterConfigs = configFields['messageWritterConfigs'].split(';')
+                else:
+                        messageWritterConfigs = defaultMessageWritterConfigs.split(';')
 		msgServers = defaultMsgServer
 		if 'msgServers' in configFields:
                         msgServers = configFields['msgServers']
 		msgServerPort = defaultMsgServerPort
 		if 'msgServerPort' in configFields:
                         msgServerPort = int(configFields['msgServerPort'])
-		messageWritterConfig = defaultMessageWritterConfig
-		if 'messageWritterConfig' in configFields:
-                        messageWritterConfig = configFields['messageWritterConfig']
 		debugOutput = defaultDebugOutput
                 if 'debugOutput' in configFields:
                         debugOutput = configFields['debugOutput']
@@ -194,13 +196,14 @@ class TopicDaemon(Daemon):
                                         conn = stomp.Connection([(msgServer,msgServerPort)], keepalive=('linux', 20, 5, 10), reconnect_attempts_max=10, use_ssl=useSSL, ssl_key_file=SSLKey, ssl_cert_file=SSLCertificate)
                                         serverReconnect = 0
                                         retryCount = 0                       
-                                        sys.stdout.write("Cycle to broker: %s\n" % msgServer)
+                                        sys.stdout.write(self.createLogEntry("Cycle to broker: %s\n" % msgServer))
                                         sys.stdout.flush()
 
-				# message writter
-                		msgWritter = MessageFileWritter()
-                		msgWritter.loadConfig(messageWritterConfig)
-                		listener.messageWritter = msgWritter
+				# message writters
+				for messageWritterConfig in messageWritterConfigs:
+					msgWritter = MessageFileWritter()
+					msgWritter.loadConfig(messageWritterConfig)
+					listener.messageWritters.append(msgWritter)
 	
 				# start connection
                                 serverReconnect +=1
@@ -213,7 +216,7 @@ class TopicDaemon(Daemon):
 					retryCount = 0
 					listener.connectedCounter = 100
 				except:
-					sys.stdout.write("Reconnect %i FAILED\n" % retryCount)
+					sys.stdout.write(self.createLogEntry("Reconnect %i FAILED\n" % retryCount))
 					sys.stdout.flush()
 
 					retryCount += 1
@@ -222,7 +225,7 @@ class TopicDaemon(Daemon):
 			loopCount = loopCount + 1
 			time.sleep(1)
 		
-		sys.stdout.write("%s ended\n" % self.name)
+		sys.stdout.write(self.createLogEntry("%s ended\n" % self.name))
                 sys.stdout.flush()
 
 if __name__ == "__main__":
