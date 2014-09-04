@@ -3,7 +3,7 @@
 
 Name: ar-consumer
 Summary: A/R Comp Engine message consumer
-Version: 1.2.0
+Version: 1.2.1
 Release: 1%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot
@@ -65,6 +65,8 @@ if [ "$1" = 0 ] ; then
 fi
 
 %changelog
+* Thu Sep 4 2014 Emir Imamagic <eimamagi@srce.hr> - 1.2.1-1%{?dist}
+- Consumer detailed files contain messages that split to multiple lines
 * Tue Jul 22 2014 Emir Imamagic <eimamagi@srce.hr> - 1.2.0-1%{?dist}
 - Add support for multiple file writters
 - Add detailed probe results to the output
