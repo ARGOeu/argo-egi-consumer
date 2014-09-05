@@ -203,8 +203,8 @@ class MessageFileWritter(MessageWritter):
 			for field in self.fileFields:
 				if field in fields:
 					fieldSplit = fields[field]
-					# need to split ?
-					if ',' in fieldSplit:
+					# serviceType can contain ',' and it has to be split to two lines 
+					if field == 'serviceType' and ',' in fieldSplit:
 						newLines = list();
 						fieldSplit = fieldSplit.split(',')				
 						# offset = 0
