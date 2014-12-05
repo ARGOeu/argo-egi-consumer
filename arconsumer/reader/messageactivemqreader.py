@@ -129,6 +129,10 @@ class MessageActiveMQReader(MessageReader):
         listener = TopicListener()
         listener.topics = self.topics
 
+        # message writters
+        for writter in self.writters:
+            listener.messageWritters.append(writter)
+
         # message server
         self.msgServer = self.msgServers[0]
 
@@ -201,6 +205,10 @@ class MessageActiveMQReader(MessageReader):
     
                 # start connection
                 serverReconnect +=1
+                try:
+                    conn.disconnect()
+                except:
+                    # do notihng
                 conn.set_listener('topiclistener', listener)
                 try:
                     conn.start()
