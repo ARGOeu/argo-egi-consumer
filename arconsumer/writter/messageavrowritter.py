@@ -108,6 +108,10 @@ class MessageAvroWritter(MessageWritter):
             self.messageFields = configFields['messageFields'].split(';')
         if 'fileFields' in configFields:
             self.fileFields = configFields['fileFields'].split(';')
+        if 'messageTagFields' in configFields:
+            self.messageTagFields = configFields['messageTagFields'].split(';')
+        if 'fileTagFields' in configFields:
+            self.fileTagFields = configFields['fileTagFields'].split(';')
 
     def writeMessage(self, fields):
         msgOk = False   
