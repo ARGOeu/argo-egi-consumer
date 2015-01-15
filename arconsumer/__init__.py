@@ -24,4 +24,3 @@
 # Framework Programme (contract # INFSO-RI-261323) 
 
 from daemon import Daemon
-from topiclistener import TopicListener

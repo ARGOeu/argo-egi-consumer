@@ -30,6 +30,7 @@ import pprint
 import stomp
 import sys
 import datetime
+import json
 import os
 from os import path
 from messagewritter import MessageWritter
@@ -44,8 +45,10 @@ defaultFileDirectory = '/var/lib/ar-consumer'
 defaultFilenameTemplate = 'ar-consumer_log_%s.avro'
 defaultAvroSchema = 'argo.avsc'
 defaultSplitFields = 'serviceType'
-defaultMessageFields = ['timestamp', 'metricName', 'serviceType', 'hostName', 'metricStatus']
-defaultFileFields = ['timestamp', 'metric', 'service', 'hostname', 'status']
+defaultMessageFields = ['timestamp', 'metricName', 'serviceType', 'hostName', 'metricStatus', 'ROC', 'voName', 'voFqan']
+defaultFileFields = ['timestamp', 'metric', 'service', 'hostname', 'status', 'roc', 'vo', 'vo_fqan']
+defaultMessageTagFields = ['ROC', 'voName', 'voFqan']
+defaultFileTagFields = ['roc', 'vo', 'vo_fqan']
 
 class MessageAvroWritter(MessageWritter):
 
@@ -57,6 +60,8 @@ class MessageAvroWritter(MessageWritter):
         self.splitFields = defaultSplitFields
         self.messageFields = defaultMessageFields
         self.fileFields = defaultFileFields
+        self.messageTagFields = defaultMessageTagFields
+        self.fileTagFields = defaultFileTagFields
 
     def loadConfig(self, configFileName):
         configFile = None
@@ -103,6 +108,10 @@ class MessageAvroWritter(MessageWritter):
             self.messageFields = configFields['messageFields'].split(';')
         if 'fileFields' in configFields:
             self.fileFields = configFields['fileFields'].split(';')
+        if 'messageTagFields' in configFields:
+            self.messageTagFields = configFields['messageTagFields'].split(';')
+        if 'fileTagFields' in configFields:
+            self.fileTagFields = configFields['fileTagFields'].split(';')        
 
     def writeMessage(self, fields):
         msgOk = False   
@@ -132,7 +141,9 @@ class MessageAvroWritter(MessageWritter):
             # lines
             lines = list()
             lines.append(dict())
+            tags = dict()
 
+            # message fields
             for field in self.messageFields:
                 if field in fields:
                     fieldSplit = fields[field]
@@ -145,13 +156,26 @@ class MessageAvroWritter(MessageWritter):
                             #new lines
                             for idx in range(0,len(lines)):
                                 newLine = lines[idx].copy()
-                                newLines[fileField] = split
+                                lines[idx][fileField] = split
+                                newLine[fileField] = split
                                 newLines.append(newLine)
                         lines = newLines
                     else:
                         for idx in range(0,len(lines)):
                             lines[idx][fileField] = fieldSplit
 
+            # tags
+            lines[idx]['tags'] = lines[idx]
+
+            #for tag in self.messageTagFields:
+            #    if tag in fields:
+            #        fileTag = self.fileTagFields[self.messageTagFields.index(tag)]
+            #        tags[fileTag] = fields[tag]
+            #if len(tags) > 0:
+            #    jsonTags = json.dumps(tags)
+            #    for idx in range(0,len(lines)):
+            #        lines[idx]['tags'] = jsonTags
+            
             schema = avro.schema.parse(open(self.avroSchema).read())
             if path.exists(filename):
                 avroFile = open(filename, 'a+')

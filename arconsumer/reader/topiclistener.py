@@ -97,7 +97,9 @@ class TopicListener(stomp.ConnectionListener):
         except Exception as inst:
             self.connectedCounter = -1
             self.connected = False
-            sys.stderr.write(self.createLogEntry('--- Error parsing Message ---\nHeaders:\n%s\nBody:\n%s\n---\n' % (headers, message)))
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            traceback.print_tb(exc_traceback)
+            sys.stderr.write(self.createLogEntry('--- Error parsing Message ---\nWritter:%s\nError:%s --> %s\n\nHeaders:\n%s\nBody:\n%s\n---\n' % (type(messageWritter).__name__, type(inst), inst.args, headers, message)))
             sys.stderr.flush()
         
         if self.debugOutput:
