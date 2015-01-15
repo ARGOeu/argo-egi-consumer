@@ -6,6 +6,10 @@
  	{"name": "service", "type": "string"},
  	{"name": "hostname", "type": "string"},
  	{"name": "metric", "type": "string"},
- 	{"name": "status", "type": "string"}
+ 	{"name": "status", "type": "string"},
+        {"name": "monitoring_host", "type": ["null", "string"], "default":null},
+        {"name": "summary", "type": ["null", "string"], "default":null},
+        {"name": "message", "type": ["null", "string"], "default":null},
+        {"name": "tags", "type": ["null", "string"], "default":null}
  ]
 }
