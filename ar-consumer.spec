@@ -3,7 +3,7 @@
 
 Name: ar-consumer
 Summary: A/R Comp Engine message consumer
-Version: 1.3.1
+Version: 1.3.2
 Release: 1%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot
@@ -30,6 +30,10 @@ install --directory %{buildroot}/var/log/ar-consumer
 install --mode 644 etc/ar-consumer/ar-consumer.conf %{buildroot}/etc/ar-consumer/
 install --mode 644 etc/ar-consumer/messagewritter.conf %{buildroot}/etc/ar-consumer/
 install --mode 644 etc/ar-consumer/messagewritter-details.conf %{buildroot}/etc/ar-consumer/
+install --mode 644 etc/ar-consumer/activemq-reader.conf %{buildroot}/etc/ar-consumer
+install --mode 644 etc/ar-consumer/avro-writter.conf %{buildroot}/etc/ar-consumer
+install --mode 644 etc/ar-consumer/file-writter.conf %{buildroot}/etc/ar-consumer
+install --mode 644 etc/ar-consumer/metric_data.avsc %{buildroot}/etc/ar-consumer
 install --mode 755 init.d/ar-consumer %{buildroot}/etc/init.d
 install --mode 755 bin/ar-consumer %{buildroot}/usr/bin
 %{__cp} -rpf arconsumer %{buildroot}/%{python_sitelib}/
@@ -45,6 +49,10 @@ install --mode 755 bin/ar-consumer %{buildroot}/usr/bin
 %config(noreplace) /etc/ar-consumer/ar-consumer.conf
 %config(noreplace) /etc/ar-consumer/messagewritter.conf
 %config(noreplace) /etc/ar-consumer/messagewritter-details.conf
+%config(noreplace) /etc/ar-consumer/activemq-reader.conf
+%config(noreplace) /etc/ar-consumer/avro-writter.conf
+%config(noreplace) /etc/ar-consumer/file-writter.conf
+%config(noreplace) /etc/ar-consumer/metric_data.avsc
 %attr(0750,arstats,arstats) /var/lib/ar-consumer
 %attr(0750,arstats,arstats) /var/log/ar-consumer
 %{pylib}
@@ -65,6 +73,8 @@ if [ "$1" = 0 ] ; then
 fi
 
 %changelog
+* Thu Jan 15 2015 Luko Gjenero <lgjenero@gmail.com> - 1.3.2-0%{?dist}
+- Added configs to rpm
 * Thu Jan 15 2015 Luko Gjenero <lgjenero@gmail.com> - 1.3.1-0%{?dist}
 - Fixes for Avro format + fix for reconneect
 * Fri Nov 28 2014 Luko Gjerneo <lgjenero@gmail.com> - 1.3.0-0%{?dist}
