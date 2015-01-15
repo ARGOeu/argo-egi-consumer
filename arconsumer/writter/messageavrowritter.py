@@ -156,7 +156,8 @@ class MessageAvroWritter(MessageWritter):
                             #new lines
                             for idx in range(0,len(lines)):
                                 newLine = lines[idx].copy()
-                                newLines[fileField] = split
+                                lines[idx][fileField] = split
+                                newLine[fileField] = split
                                 newLines.append(newLine)
                         lines = newLines
                     else:
