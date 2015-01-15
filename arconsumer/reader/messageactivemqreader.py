@@ -128,7 +128,7 @@ class MessageActiveMQReader(MessageReader):
         # create listener
         listener = TopicListener()
         listener.topics = self.topics
-
+ 
         # message writters
         for writter in self.writters:
             listener.messageWritters.append(writter)
@@ -199,16 +199,13 @@ class MessageActiveMQReader(MessageReader):
                     sys.stdout.write(self.createLogEntry("Cycle to broker: %s\n" % self.msgServer))
                     sys.stdout.flush()
 
-                # message writters
-                for writter in self.writters:
-                    listener.messageWritters.append(writter)
-    
                 # start connection
                 serverReconnect +=1
                 try:
                     conn.disconnect()
                 except:
                     # do notihng
+                    sys.exc_clear()
                 conn.set_listener('topiclistener', listener)
                 try:
                     conn.start()

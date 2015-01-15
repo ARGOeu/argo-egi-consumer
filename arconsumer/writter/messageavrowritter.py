@@ -30,6 +30,7 @@ import pprint
 import stomp
 import sys
 import datetime
+import json
 import os
 from os import path
 from messagewritter import MessageWritter
@@ -46,6 +47,8 @@ defaultAvroSchema = 'argo.avsc'
 defaultSplitFields = 'serviceType'
 defaultMessageFields = ['timestamp', 'metricName', 'serviceType', 'hostName', 'metricStatus']
 defaultFileFields = ['timestamp', 'metric', 'service', 'hostname', 'status']
+defaultMessageTagFields = ['ROC', 'voName', 'voFqan']
+defaultFileTagFields = ['roc', 'vo', 'vo_fqan']
 
 class MessageAvroWritter(MessageWritter):
 
@@ -57,6 +60,8 @@ class MessageAvroWritter(MessageWritter):
         self.splitFields = defaultSplitFields
         self.messageFields = defaultMessageFields
         self.fileFields = defaultFileFields
+        self.messageTagFields = defaultMessageTagFields
+        self.fileTagFields = defaultFileTagFields
 
     def loadConfig(self, configFileName):
         configFile = None
@@ -132,7 +137,9 @@ class MessageAvroWritter(MessageWritter):
             # lines
             lines = list()
             lines.append(dict())
+            tags = dict()
 
+            # message fields
             for field in self.messageFields:
                 if field in fields:
                     fieldSplit = fields[field]
@@ -152,6 +159,15 @@ class MessageAvroWritter(MessageWritter):
                         for idx in range(0,len(lines)):
                             lines[idx][fileField] = fieldSplit
 
+            # tags
+            for tag in self.messageTagFields:
+                if tag in fields:
+                    fileTag = self.fileTagFields[self.messageTagFields.index(tag)]
+                    tags[fileTag] = fields[tag]
+            jsonTags = json.dumps(tags)
+            for idx in range(0,len(lines)):
+                lines[idx]['tags'] = jsonTags
+            
             schema = avro.schema.parse(open(self.avroSchema).read())
             if path.exists(filename):
                 avroFile = open(filename, 'a+')
