@@ -7,9 +7,14 @@
  	{"name": "hostname", "type": "string"},
  	{"name": "metric", "type": "string"},
  	{"name": "status", "type": "string"},
-        {"name": "monitoring_host", "type": ["null", "string"], "default":null},
-        {"name": "summary", "type": ["null", "string"], "default":null},
-        {"name": "message", "type": ["null", "string"], "default":null},
-        {"name": "tags", "type": ["null", "string"], "default":null}
+        {"name": "monitoring_host", "type": ["null", "string"]},
+        {"name": "summary", "type": ["null", "string"]},
+        {"name": "message", "type": ["null", "string"]},
+        {"name": "tags", "type": ["null", {"name" : "Tags",
+                                           "type" : "record",
+                                           "fields" : [
+                                                 {"name" : "roc", "type" : ["null", "string"]},
+                                                 {"name" : "vo", "type" : ["null", "string"]},
+                                                 {"name" : "vo_fqann", "type" : ["null", "string"]}]}]}
  ]
 }

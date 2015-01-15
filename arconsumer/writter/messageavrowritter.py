@@ -45,8 +45,8 @@ defaultFileDirectory = '/var/lib/ar-consumer'
 defaultFilenameTemplate = 'ar-consumer_log_%s.avro'
 defaultAvroSchema = 'argo.avsc'
 defaultSplitFields = 'serviceType'
-defaultMessageFields = ['timestamp', 'metricName', 'serviceType', 'hostName', 'metricStatus']
-defaultFileFields = ['timestamp', 'metric', 'service', 'hostname', 'status']
+defaultMessageFields = ['timestamp', 'metricName', 'serviceType', 'hostName', 'metricStatus', 'ROC', 'voName', 'voFqan']
+defaultFileFields = ['timestamp', 'metric', 'service', 'hostname', 'status', 'roc', 'vo', 'vo_fqan']
 defaultMessageTagFields = ['ROC', 'voName', 'voFqan']
 defaultFileTagFields = ['roc', 'vo', 'vo_fqan']
 
@@ -111,7 +111,7 @@ class MessageAvroWritter(MessageWritter):
         if 'messageTagFields' in configFields:
             self.messageTagFields = configFields['messageTagFields'].split(';')
         if 'fileTagFields' in configFields:
-            self.fileTagFields = configFields['fileTagFields'].split(';')
+            self.fileTagFields = configFields['fileTagFields'].split(';')        
 
     def writeMessage(self, fields):
         msgOk = False   
@@ -165,13 +165,16 @@ class MessageAvroWritter(MessageWritter):
                             lines[idx][fileField] = fieldSplit
 
             # tags
-            for tag in self.messageTagFields:
-                if tag in fields:
-                    fileTag = self.fileTagFields[self.messageTagFields.index(tag)]
-                    tags[fileTag] = fields[tag]
-            jsonTags = json.dumps(tags)
-            for idx in range(0,len(lines)):
-                lines[idx]['tags'] = jsonTags
+            lines[idx]['tags'] = lines[idx]
+
+            #for tag in self.messageTagFields:
+            #    if tag in fields:
+            #        fileTag = self.fileTagFields[self.messageTagFields.index(tag)]
+            #        tags[fileTag] = fields[tag]
+            #if len(tags) > 0:
+            #    jsonTags = json.dumps(tags)
+            #    for idx in range(0,len(lines)):
+            #        lines[idx]['tags'] = jsonTags
             
             schema = avro.schema.parse(open(self.avroSchema).read())
             if path.exists(filename):

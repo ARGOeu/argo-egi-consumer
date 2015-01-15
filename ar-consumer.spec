@@ -66,6 +66,7 @@ fi
 
 %changelog
 * Thu Jan 15 2015 Luko Gjenero <lgjenero@gmail.com> - 1.3.1-0%{?dist}
+- Fixes for Avro format + fix for reconneect
 * Fri Nov 28 2014 Luko Gjerneo <lgjenero@gmail.com> - 1.3.0-0%{?dist}
 - Added Avro format
 * Thu Sep 4 2014 Emir Imamagic <eimamagi@srce.hr> - 1.2.1-1%{?dist}
