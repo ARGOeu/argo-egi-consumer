@@ -4,7 +4,7 @@
 Name: ar-consumer
 Summary: A/R Comp Engine message consumer
 Version: 1.3.2
-Release: 1%{?dist}
+Release: 3%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot
 Group:     EGI/SA4

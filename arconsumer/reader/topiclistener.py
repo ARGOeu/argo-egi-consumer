@@ -29,6 +29,7 @@ import logging
 import stomp
 import sys
 import datetime
+import traceback
 from os import path
 #from writter import MessageWritter
 
