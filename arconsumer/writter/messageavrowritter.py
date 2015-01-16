@@ -43,12 +43,16 @@ from avro.io import DatumWriter
 
 defaultFileDirectory = '/var/lib/ar-consumer'
 defaultFilenameTemplate = 'ar-consumer_log_%s.avro'
+defaultErrorFilenameTemplate = 'ar-consumer_error_log_%s.avro'
 defaultAvroSchema = 'argo.avsc'
 defaultSplitFields = 'serviceType'
 defaultMessageFields = ['timestamp', 'metricName', 'serviceType', 'hostName', 'metricStatus', 'ROC', 'voName', 'voFqan']
 defaultFileFields = ['timestamp', 'metric', 'service', 'hostname', 'status', 'roc', 'vo', 'vo_fqan']
 defaultMessageTagFields = ['ROC', 'voName', 'voFqan']
 defaultFileTagFields = ['roc', 'vo', 'vo_fqan']
+defaultFileLogPastDays = 1
+defaultFileLogFutureDays = 1
+defaultErrorLogFaultyTimestamps = 0
 
 class MessageAvroWritter(MessageWritter):
 
@@ -56,12 +60,16 @@ class MessageAvroWritter(MessageWritter):
         MessageWritter.__init__(self) 
         self.fileDiectory = defaultFileDirectory;
         self.filenameTemplate =  defaultFilenameTemplate
+        self.errorFilenameTemplate = defaultErrorFilenameTemplate 
         self.avroSchema = defaultAvroSchema
         self.splitFields = defaultSplitFields
         self.messageFields = defaultMessageFields
         self.fileFields = defaultFileFields
         self.messageTagFields = defaultMessageTagFields
         self.fileTagFields = defaultFileTagFields
+        self.fileLogPastDays = defaultFileLogPastDays
+        self.fileLogFutureDays = defaultFileLogFutureDays
+        self.errorLogFaultyTimestamps = defaultErrorLogFaultyTimestamps
 
     def loadConfig(self, configFileName):
         configFile = None
@@ -100,6 +108,8 @@ class MessageAvroWritter(MessageWritter):
             self.fileDirectory = configFields['fileDirectory']
         if 'filenameTemplate' in configFields:
             self.filenameTemplate = configFields['filenameTemplate']
+        if 'errorFilenameTemplate ' in configFields:
+            self.errorFilenameTemplate = configFields['errorFilenameTemplate']
         if 'avroSchema' in configFields:
             self.avroSchema = configFields['avroSchema']
         if 'splitFields' in configFields:
@@ -108,10 +118,12 @@ class MessageAvroWritter(MessageWritter):
             self.messageFields = configFields['messageFields'].split(';')
         if 'fileFields' in configFields:
             self.fileFields = configFields['fileFields'].split(';')
-        if 'messageTagFields' in configFields:
-            self.messageTagFields = configFields['messageTagFields'].split(';')
-        if 'fileTagFields' in configFields:
-            self.fileTagFields = configFields['fileTagFields'].split(';')        
+        if 'fileLogPastDays' in configFields:
+            self.fileLogPastDays = configFields['fileLogPastDays']
+        if 'fileLogFutureDays' in configFields:
+            self.fileLogFutureDays = configFields['fileLogFutureDays']
+        if 'errorLogFaultyTimestamps' in configFields:
+            self.errorLogFaultyTimestamps = configFields['errorLogFaultyTimestamps']
 
     def writeMessage(self, fields):
         msgOk = False   
@@ -156,7 +168,6 @@ class MessageAvroWritter(MessageWritter):
                             #new lines
                             for idx in range(0,len(lines)):
                                 newLine = lines[idx].copy()
-                                lines[idx][fileField] = split
                                 newLine[fileField] = split
                                 newLines.append(newLine)
                         lines = newLines
@@ -195,3 +206,8 @@ class MessageAvroWritter(MessageWritter):
         if self.fileDirectory[-1] != '/':
             self.fileDirectory = self.fileDirectory + '/'
         return self.fileDirectory + self.filenameTemplate % timestamp
+
+    def createErrorLogFilename(self, timestamp):
+        if self.fileDirectory[-1] != '/':
+            self.fileDirectory = self.fileDirectory + '/'
+        return self.fileDirectory + self.errorFilenameTemplate % timestamp
