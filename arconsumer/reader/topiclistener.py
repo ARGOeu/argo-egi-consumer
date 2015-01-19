@@ -82,7 +82,7 @@ class TopicListener(stomp.ConnectionListener):
             if len(splitLine) > 1:
                 key = splitLine[0]
                 value = splitLine[1]
-                fields[key] = value
+                fields[key] = value.encode('utf-8', 'replace')
 
         if self.debugOutput:
             sys.stdout.write(self.createLogEntry('-' * 20))
