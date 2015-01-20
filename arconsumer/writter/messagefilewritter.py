@@ -228,7 +228,7 @@ class MessageFileWritter(MessageWritter):
 			# msgFile.write(self.fileFieldFooter)
 
 			for line in lines:
-                                msgFile.write(line)
+                                msgFile.write(line.encode('utf8', 'replace'))
 			
 			msgFile.close();	
 
