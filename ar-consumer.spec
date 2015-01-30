@@ -4,7 +4,7 @@
 Name: ar-consumer
 Summary: A/R Comp Engine message consumer
 Version: 1.3.2
-Release: 7%{?dist}
+Release: 8%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot
 Group:     EGI/SA4
@@ -73,6 +73,8 @@ if [ "$1" = 0 ] ; then
 fi
 
 %changelog
+* Fri Jan 30 2015 Luko Gjenero <lgjenero@gmail.com> - 1.3.2-0%{?dist}
+- Fixed avro schema typo
 * Thu Jan 15 2015 Luko Gjenero <lgjenero@gmail.com> - 1.3.2-0%{?dist}
 - Added configs to rpm
 * Thu Jan 15 2015 Luko Gjenero <lgjenero@gmail.com> - 1.3.1-0%{?dist}
