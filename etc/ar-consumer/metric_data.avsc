@@ -2,7 +2,7 @@
  "type": "record",
  "name": "metric_data",
  "fields": [
-  	{"name": "timestamp", "type": "string"},
+ 	{"name": "timestamp", "type": "string"},
  	{"name": "service", "type": "string"},
  	{"name": "hostname", "type": "string"},
  	{"name": "metric", "type": "string"},
@@ -15,6 +15,6 @@
                                            "fields" : [
                                                  {"name" : "roc", "type" : ["null", "string"]},
                                                  {"name" : "vo", "type" : ["null", "string"]},
-                                                 {"name" : "vo_fqann", "type" : ["null", "string"]}]}]}
+                                                 {"name" : "vo_fqan", "type" : ["null", "string"]}]}]}
  ]
 }
