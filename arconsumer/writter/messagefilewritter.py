@@ -167,7 +167,7 @@ class MessageFileWritter(MessageWritter):
 
 	def writeMessage(self, fields):
 
-		msgOk = False	
+                msgOk = False	
 		nowTime = datetime.datetime.utcnow().date()
 		msgTime = nowTime
 		if 'timestamp' in fields:
@@ -228,8 +228,8 @@ class MessageFileWritter(MessageWritter):
 			# msgFile.write(self.fileFieldFooter)
 
 			for line in lines:
-                                msgFile.write(line)
-
+                                msgFile.write(line.encode('utf8', 'replace'))
+			
 			msgFile.close();	
 
 

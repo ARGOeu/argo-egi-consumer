@@ -23,4 +23,22 @@
 # the EGI-InSPIRE project through the European Commission's 7th
 # Framework Programme (contract # INFSO-RI-261323) 
 
-from daemon import Daemon
+class MessageReader(object):
+    
+    def __init__(self): 
+        # log file
+        self.configFile = ''
+        # date format
+        self.dateFormat = '%Y-%m-%dT%H:%M:%SZ'
+
+    def loadConfig(self, configFile):
+        """Load reader configuration from file"""
+
+    def addWritter(self, writter):
+        """Set message writter"""
+
+    def start(self):
+        """Start the message writter"""        
+
+    def isRunning(self):
+        """Check if reader is running"""

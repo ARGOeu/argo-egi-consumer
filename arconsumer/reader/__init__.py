@@ -1,4 +1,3 @@
-
 # Copyright (c) 2013 GRNET S.A., SRCE, IN2P3 CNRS Computing Centre
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,4 +22,6 @@
 # the EGI-InSPIRE project through the European Commission's 7th
 # Framework Programme (contract # INFSO-RI-261323) 
 
-from daemon import Daemon
+from messagereader import MessageReader
+from topiclistener import TopicListener
+from messageactivemqreader import MessageActiveMQReader
