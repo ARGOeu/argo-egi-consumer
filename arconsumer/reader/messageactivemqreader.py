@@ -12,16 +12,16 @@
 # IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
 # express or implied. See the License for the specific language
 # governing permissions and limitations under the License.
-# 
+#
 # The views and conclusions contained in the software and
 # documentation are those of the authors and should not be
 # interpreted as representing official policies, either expressed
 # or implied, of either GRNET S.A., SRCE or IN2P3 CNRS Computing
 # Centre
-# 
+#
 # The work represented by this source file is partially funded by
 # the EGI-InSPIRE project through the European Commission's 7th
-# Framework Programme (contract # INFSO-RI-261323) 
+# Framework Programme (contract # INFSO-RI-261323)
 
 import sys
 import os
@@ -66,7 +66,7 @@ class MessageActiveMQReader(MessageReader):
         if os.path.isfile(self.configFile):
             configFile = open(self.configFile, 'r')
             lines = configFile.readlines()
-        
+
             for line in lines:
                 if line[0] == '#':
                     continue
@@ -103,9 +103,9 @@ class MessageActiveMQReader(MessageReader):
         if 'listenerIdleTimeout' in configFields:
             self.listenerIdleTimeout = configFields['listenerIdleTimeout']
         if 'serverReconnectCycle' in configFields:
-            self.serverReconnectCycle = configFields['serverReconnectCycle'] 
-                
-        # SSL               
+            self.serverReconnectCycle = configFields['serverReconnectCycle']
+
+        # SSL
         if 'useSSL' in configFields:
             self.useSSL = configFields['useSSL'] == 1
         if 'SSLCertificate' in configFields:
@@ -128,7 +128,7 @@ class MessageActiveMQReader(MessageReader):
         # create listener
         listener = TopicListener()
         listener.topics = self.topics
- 
+
         # message writters
         for writter in self.writters:
             listener.messageWritters.append(writter)
@@ -142,16 +142,18 @@ class MessageActiveMQReader(MessageReader):
         listener.debugOutput = self.debugOutput
         loopCount = 0
         serverReconnect = self.serverReconnectCycle + 1
+        import pdb
+        pdb.set_trace()
         while True:
 
             reconnect = False
-        
+
             #check connection
             if not listener.connected:
                 listener.connectedCounter -= 1
-                if listener.connectedCounter <= 0:              
+                if listener.connectedCounter <= 0:
                     reconnect = True
-            
+
             else:
 
                 ###########################################################
@@ -163,7 +165,7 @@ class MessageActiveMQReader(MessageReader):
                 ###########################################################
 
                 if self.listenerIdleTimeout > 0 and loopCount >= self.listenerIdleTimeout:
-                                        
+
                     if not listener.messagesWritten > 0:
                         reconnect = True
                         loopCount = 0
@@ -195,7 +197,7 @@ class MessageActiveMQReader(MessageReader):
                     self.msgServer = self.msgServers[msgServerIdx]
                     conn = stomp.Connection([(self.msgServer,self.msgServerPort)], keepalive=('linux', 20, 5, 10), reconnect_attempts_max=10, use_ssl=self.useSSL, ssl_key_file=self.SSLKey, ssl_cert_file=self.SSLCertificate)
                     serverReconnect = 0
-                    retryCount = 0                       
+                    retryCount = 0
                     sys.stdout.write(self.createLogEntry("Cycle to broker: %s\n" % self.msgServer))
                     sys.stdout.flush()
 
@@ -210,7 +212,7 @@ class MessageActiveMQReader(MessageReader):
                 try:
                     conn.start()
                     conn.connect()
-                    for topic in listener.topics:           
+                    for topic in listener.topics:
                         conn.subscribe(destination=topic, ack='auto')
                     retryCount = 0
                     listener.connectedCounter = 100
@@ -220,9 +222,9 @@ class MessageActiveMQReader(MessageReader):
 
                     retryCount += 1
                     listener.connectedCounter = 10
-                                            
+
             loopCount = loopCount + 1
-            time.sleep(1) 
+            time.sleep(1)
 
 
     def isRunning(self):
@@ -230,11 +232,3 @@ class MessageActiveMQReader(MessageReader):
 
     def createLogEntry(self, msg):
         return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + ' ' + msg + '\n'
-
-
-
-
-
-
-
-

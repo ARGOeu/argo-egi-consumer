@@ -12,16 +12,16 @@
 # IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
 # express or implied. See the License for the specific language
 # governing permissions and limitations under the License.
-# 
+#
 # The views and conclusions contained in the software and
 # documentation are those of the authors and should not be
 # interpreted as representing official policies, either expressed
 # or implied, of either GRNET S.A., SRCE or IN2P3 CNRS Computing
 # Centre
-# 
+#
 # The work represented by this source file is partially funded by
 # the EGI-InSPIRE project through the European Commission's 7th
-# Framework Programme (contract # INFSO-RI-261323) 
+# Framework Programme (contract # INFSO-RI-261323)
 
 import time
 import sys
@@ -34,19 +34,19 @@ from os import path
 #from writter import MessageWritter
 
 class TopicListener(stomp.ConnectionListener):
-    
-    def __init__(self): 
+
+    def __init__(self):
         # connection
         self.connected = False
         self.connectedCounter = 100
         # topic
         self.topic = None
         # output
-        self.debugOutput = 0 
+        self.debugOutput = 0
         # meassage writter
         self.messageWritters = [];
         self.messagesWritten = 0;
-    
+
     def createLogEntry(self, msg):
        return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + ' ' + msg + '\n'
 
@@ -72,7 +72,7 @@ class TopicListener(stomp.ConnectionListener):
     def on_message(self, headers, message):
         lines = message.split('\n')
         fields = dict()
-    
+
         #header fields
         fields.update(headers)
 
@@ -89,12 +89,12 @@ class TopicListener(stomp.ConnectionListener):
             sys.stdout.write('Message Header:\n %s' % headers)
             sys.stdout.write('Message Body:\n %s' % message)
             sys.stdout.flush()
-        
+
         try:
             for messageWritter in self.messageWritters:
                 messageWritter.writeMessage(fields);
-            self.messagesWritten = self.messagesWritten + 1 
-        
+            self.messagesWritten = self.messagesWritten + 1
+
         except Exception as inst:
             self.connectedCounter = -1
             self.connected = False
@@ -102,7 +102,7 @@ class TopicListener(stomp.ConnectionListener):
             traceback.print_tb(exc_traceback)
             sys.stderr.write(self.createLogEntry('--- Error parsing Message ---\nWritter:%s\nError:%s --> %s\n\nHeaders:\n%s\nBody:\n%s\n---\n' % (type(messageWritter).__name__, type(inst), inst.args, headers, message)))
             sys.stderr.flush()
-        
+
         if self.debugOutput:
             sys.stdout.write(self.createLogEntry('msg sent to writter\n\n'))
             sys.stdout.flush()

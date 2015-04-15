@@ -12,16 +12,16 @@
 # IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
 # express or implied. See the License for the specific language
 # governing permissions and limitations under the License.
-# 
+#
 # The views and conclusions contained in the software and
 # documentation are those of the authors and should not be
 # interpreted as representing official policies, either expressed
 # or implied, of either GRNET S.A., SRCE or IN2P3 CNRS Computing
 # Centre
-# 
+#
 # The work represented by this source file is partially funded by
 # the EGI-InSPIRE project through the European Commission's 7th
-# Framework Programme (contract # INFSO-RI-261323) 
+# Framework Programme (contract # INFSO-RI-261323)
 
 import time
 import sys
@@ -57,10 +57,10 @@ defaultErrorLogFaultyTimestamps = 0
 class MessageAvroWritter(MessageWritter):
 
     def __init__(self):
-        MessageWritter.__init__(self) 
+        MessageWritter.__init__(self)
         self.fileDiectory = defaultFileDirectory;
         self.filenameTemplate =  defaultFilenameTemplate
-        self.errorFilenameTemplate = defaultErrorFilenameTemplate 
+        self.errorFilenameTemplate = defaultErrorFilenameTemplate
         self.avroSchema = defaultAvroSchema
         self.splitFields = defaultSplitFields
         self.messageFields = defaultMessageFields
@@ -126,7 +126,7 @@ class MessageAvroWritter(MessageWritter):
             self.errorLogFaultyTimestamps = configFields['errorLogFaultyTimestamps']
 
     def writeMessage(self, fields):
-        msgOk = False   
+        msgOk = False
         nowTime = datetime.datetime.utcnow().date()
         msgTime = nowTime
         if 'timestamp' in fields:
@@ -149,7 +149,7 @@ class MessageAvroWritter(MessageWritter):
             logMsg = True
 
         if logMsg:
-            
+
             # lines
             lines = list()
             lines.append(dict())
@@ -160,10 +160,10 @@ class MessageAvroWritter(MessageWritter):
                 if field in fields:
                     fieldSplit = fields[field]
                     fileField = self.fileFields[self.messageFields.index(field)]
-                    # serviceType can contain ',' and it has to be split to two lines 
+                    # serviceType can contain ',' and it has to be split to two lines
                     if field in self.splitFields and ',' in fieldSplit:
                         newLines = list();
-                        fieldSplit = fieldSplit.split(',')              
+                        fieldSplit = fieldSplit.split(',')
                         for split in fieldSplit:
                             #new lines
                             for idx in range(0,len(lines)):
@@ -186,7 +186,7 @@ class MessageAvroWritter(MessageWritter):
             #    jsonTags = json.dumps(tags)
             #    for idx in range(0,len(lines)):
             #        lines[idx]['tags'] = jsonTags
-            
+
             schema = avro.schema.parse(open(self.avroSchema).read())
             if path.exists(filename):
                 avroFile = open(filename, 'a+')

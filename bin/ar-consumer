@@ -13,16 +13,16 @@
 # IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
 # express or implied. See the License for the specific language
 # governing permissions and limitations under the License.
-# 
+#
 # The views and conclusions contained in the software and
 # documentation are those of the authors and should not be
 # interpreted as representing official policies, either expressed
 # or implied, of either GRNET S.A., SRCE or IN2P3 CNRS Computing
 # Centre
-# 
+#
 # The work represented by this source file is partially funded by
 # the EGI-InSPIRE project through the European Commission's 7th
-# Framework Programme (contract # INFSO-RI-261323) 
+# Framework Programme (contract # INFSO-RI-261323)
 
 import sys
 import os
@@ -37,7 +37,7 @@ from arconsumer.writter import MessageAvroWritter
 
 # topis deamon defaults
 defaultDaemonConfigFile = '/etc/ar-consumer/ar-consumer.conf'
-defaultDaemonPIDFile = '/var/log/ar-consumer/ar-consumer.pid' 
+defaultDaemonPIDFile = '/var/log/ar-consumer/ar-consumer.pid'
 defaultDaemonStdIn = '/dev/null'
 defaultDaemonStdOut = '/var/log/ar-consumer/ar-consumer.out'
 defaultDaemonStdErr = '/var/log/ar-consumer/ar-consumer.err'
@@ -56,16 +56,16 @@ class TopicDaemon(Daemon):
         return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + ' ' + msg + '\n'
 
     def run(self):
-        
+
         logging.basicConfig(format='%(asctime)s %(message)s')
-    
+
         #load config
         configFile = None
         configFields = dict()
         if os.path.isfile(defaultDaemonConfigFile):
             configFile = open(defaultDaemonConfigFile, 'r')
             lines = configFile.readlines()
-        
+
             for line in lines:
                 if line[0] == '#':
                     continue
@@ -107,7 +107,7 @@ class TopicDaemon(Daemon):
         writterConfigs = defaultWritterConfigs
         if 'writterConfigs' in configFields:
             writterConfigs = configFields['writterConfigs'].split(';')
-                
+
 
         # create readers and writters
         dataReaders = []
@@ -125,7 +125,7 @@ class TopicDaemon(Daemon):
             elif writterType == 'avro':
                 writter = MessageAvroWritter()
                 writter.loadConfig(writterConfig)
-                dataWritters.append(writter)        
+                dataWritters.append(writter)
 
         for i in range (0, len(readers)):
             readerType = readers[i]
@@ -151,7 +151,7 @@ class TopicDaemon(Daemon):
             if exit:
                 break
             time.sleep(1)
-        
+
         sys.stdout.write(self.createLogEntry("%s ended\n" % self.name))
         sys.stdout.flush()
 
@@ -165,7 +165,7 @@ if __name__ == "__main__":
         elif 'restart' == sys.argv[1]:
             daemon.restart()
         elif 'status' == sys.argv[1]:
-                        sys.exit(daemon.status())
+            sys.exit(daemon.status())
         else:
             print "Unknown command"
             sys.exit(2)
