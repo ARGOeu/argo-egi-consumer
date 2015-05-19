@@ -1,13 +1,14 @@
 Name: argo-egi-consumer
 Summary: A/R Comp Engine message consumer
 Version: 1.4.0
-Release: 4%{?dist}
+Release: 5%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot
 Group:     EGI/SA4
 BuildArch: noarch
 Source0:   %{name}-%{version}.tar.gz
 Requires: stomppy >= 3.1.6
+Obsoletes: ar-consumer
 
 %description
 Installs the service for consuming SAM monitoring results
@@ -49,6 +50,8 @@ if [ "$1" = 0 ] ; then
 fi
 
 %changelog
+* Tue May 19 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-5%{?dist}
+- renamed package obsoletes old named one
 * Tue May 19 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-4%{?dist}
 - prevent multiple threads reporting number of writmsgs
 * Tue May 19 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-3%{?dist}
