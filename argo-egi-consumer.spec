@@ -1,7 +1,7 @@
 Name: argo-egi-consumer
 Summary: A/R Comp Engine message consumer
 Version: 1.4.0
-Release: 5%{?dist}
+Release: 6%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot
 Group:     EGI/SA4
@@ -45,11 +45,13 @@ getent passwd arstats > /dev/null || \
 
 %preun
 if [ "$1" = 0 ] ; then
-   /sbin/service argo-egi-consumer stop
+   /sbin/service argo-egi-consumer --stop
    /sbin/chkconfig --del argo-egi-consumer
 fi
 
 %changelog
+* Tue May 19 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-6%{?dist}
+- subscribe to new destinations after config reload 
 * Tue May 19 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-5%{?dist}
 - renamed package obsoletes old named one
 * Tue May 19 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-4%{?dist}

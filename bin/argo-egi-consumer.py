@@ -158,7 +158,11 @@ class Daemon:
                 self.reader.conn.stop()
                 self.reader.conn.disconnect()
             except stomp.exception.NotConnectedException:
-                self.reader.connect()
+                self.reader.conn.start()
+                self.reader.conn.connect()
+                log.info('Subscribed to %s' % repr(self.reader.topics))
+                for topic in self.reader.topics:
+                    self.reader.conn.subscribe(destination=topic, ack='auto')
 
         signal.signal(signal.SIGHUP, sighupcleanup)
 
@@ -200,9 +204,9 @@ class Daemon:
         else:
             os.kill(pid, signal.SIGTERM)
 
-    def restart(self):
+    def restart(self, nofork):
         self.stop()
-        self.start()
+        self.start(nofork)
 
     def status(self):
         # Get the pid from the pidfile
@@ -247,7 +251,7 @@ def main():
     elif args.stop:
         daemon.stop()
     elif args.restart:
-        daemon.restart()
+        daemon.restart(args.nofork)
     elif args.status:
         daemon.status()
     else:

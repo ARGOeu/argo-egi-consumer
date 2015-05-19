@@ -148,6 +148,7 @@ class MessageReader:
         try:
             self.conn.start()
             self.conn.connect()
+            self.log.info('Subscribed to %s' % repr(self.listener.topics))
             for topic in self.listener.topics:
                 self.conn.subscribe(destination=topic, ack='auto')
             self.listener.connectedCounter = 100
