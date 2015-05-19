@@ -1,7 +1,7 @@
 Name: argo-egi-consumer
 Summary: A/R Comp Engine message consumer
 Version: 1.4.0
-Release: 3%{?dist}
+Release: 4%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot
 Group:     EGI/SA4
@@ -49,6 +49,8 @@ if [ "$1" = 0 ] ; then
 fi
 
 %changelog
+* Tue May 19 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-4%{?dist}
+- prevent multiple threads reporting number of writmsgs
 * Tue May 19 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-3%{?dist}
 - reference github issues 
 * Tue May 19 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-2%{?dist}
@@ -63,6 +65,7 @@ fi
   https://github.com/ARGOeu/ARGO/issues/100
 - daemon process privileges dropped via os sys interface
 - added SIGHUP, SIGTERM handlers
+- fixed bug with messages with paired service types
 - setup.py with automatic version catch from spec 
 * Fri Jan 30 2015 Luko Gjenero <lgjenero@gmail.com> - 1.3.2-0%{?dist}
 - Fixed avro schema typo
