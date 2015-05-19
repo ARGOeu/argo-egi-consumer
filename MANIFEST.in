@@ -1,2 +1,6 @@
-include *.txt
-recursive-include docs *.txt
+include bin/*.py
+include etc/*.conf
+include etc/*.avsc
+include init.d/*
+include modules/*.py
+include argo-egi-consumer.spec

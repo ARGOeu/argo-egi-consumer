@@ -1,0 +1,34 @@
+#!/bin/bash
+# argo-egi-consumer daemon
+# chkconfig: 345 20 80
+# description: argo-egi-consumer daemon
+# processname: argo-egi-consumer
+
+. /etc/rc.d/init.d/functions
+PROG_NAME="argo-egi-consumer"
+DAEMON_PATH="/usr/bin/argo-egi-consumer.py"
+
+case "$1" in
+--start)
+	echo -n $"Starting $PROG_NAME: "
+	daemon $DAEMON_PATH --start
+	echo
+;;
+--status)
+	$DAEMON_PATH --status
+;;
+--stop)
+	echo -n $"Stopping $PROG_NAME: "
+	daemon $DAEMON_PATH --stop
+	echo
+;;
+--restart)
+	echo -n $"Restarting $PROG_NAME: "
+  daemon $DAEMON_PATH --restart 
+	echo
+;;
+*)
+  echo "Usage: $0 {--status|--start|--stop|--restart}"
+  exit 1
+esac
+
