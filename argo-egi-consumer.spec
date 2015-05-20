@@ -1,7 +1,7 @@
 Name: argo-egi-consumer
 Summary: A/R Comp Engine message consumer
 Version: 1.4.0
-Release: 8%{?dist}
+Release: 9%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot
 Group:     EGI/SA4
@@ -50,6 +50,8 @@ if [ "$1" = 0 ] ; then
 fi
 
 %changelog
+* Wed May 20 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-9%{?dist}
+- python 2.6 has slightly different API for StreamHandler logger
 * Wed May 20 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-8%{?dist}
 - fix cycling to different broker on config reload
 * Wed May 20 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-7%{?dist}

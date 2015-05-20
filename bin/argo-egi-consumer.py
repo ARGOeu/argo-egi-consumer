@@ -208,7 +208,7 @@ class Daemon:
 
     def status(self):
         # Get the pid from the pidfile
-        handler = logging.StreamHandler(stream=sys.stdout)
+        handler = logging.StreamHandler()
         global log
         log.addHandler(handler)
         try:
