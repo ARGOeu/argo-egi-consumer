@@ -183,7 +183,6 @@ class Daemon:
             else:
                 self._delpid
 
-        log.info("Started")
         self._setup_sighandlers()
         # Start the daemon
         self._daemonize(nofork)
@@ -210,6 +209,9 @@ class Daemon:
 
     def status(self):
         # Get the pid from the pidfile
+        handler = logging.StreamHandler(stream=sys.stdout)
+        global log
+        log.addHandler(handler)
         try:
             pf = file(self.pidfile,'r')
             pid = int(pf.read().strip())
@@ -220,17 +222,21 @@ class Daemon:
         if pid:
             if self._is_pid_running(pid):
                 log.info("%i is running..." % (pid))
+                log.removeHandler(handler)
                 return 0
             else:
                 log.info("Stopped")
+                log.removeHandler(handler)
                 return 3
 
         else:
             log.info("Stopped")
+            log.removeHandler(handler)
             return 3
 
     def _run(self):
         self.reader = MessageReader()
+        log.info("Started")
         self.reader.run()
 
 def main():

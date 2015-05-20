@@ -16,10 +16,14 @@ class AbstractLogger(object):
     def warning(self, msg):
         pass
 
+    def addHandler(self, hdlr):
+        pass
+
+    def removeHandler(self, hdlr):
+        pass
 
 class MsgLogger(AbstractLogger):
     def __init__(self):
-        logging.basicConfig()
         formatter = logging.Formatter(LOGFORMAT)
         self.mylog = logging.getLogger(daemonname)
         self.mylog.setLevel(logging.DEBUG)
@@ -36,6 +40,11 @@ class MsgLogger(AbstractLogger):
     def warning(self, msg):
         self.mylog.warning(msg)
 
+    def addHandler(self, hdlr):
+        self.mylog.addHandler(hdlr)
+
+    def removeHandler(self, hdlr):
+        self.mylog.removeHandler(hdlr)
 
 class ProxyMsgLogger(AbstractLogger):
     def __init__(self):
@@ -47,6 +56,12 @@ class ProxyMsgLogger(AbstractLogger):
 
     def info(self, msg):
         self.__class__.shared_object.info(msg)
+
+    def addHandler(self, hdlr):
+        self.__class__.shared_object.addHandler(hdlr)
+
+    def removeHandler(self, hdlr):
+        self.__class__.shared_object.removeHandler(hdlr)
 
     def warning(self, msg):
         self.__class__.shared_object.warning(msg)

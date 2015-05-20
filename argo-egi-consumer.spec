@@ -1,7 +1,7 @@
 Name: argo-egi-consumer
 Summary: A/R Comp Engine message consumer
 Version: 1.4.0
-Release: 6%{?dist}
+Release: 7%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot
 Group:     EGI/SA4
@@ -50,6 +50,8 @@ if [ "$1" = 0 ] ; then
 fi
 
 %changelog
+* Wed May 20 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-7%{?dist}
+- load selectively StreamHandler logger
 * Tue May 19 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-6%{?dist}
 - subscribe to new destinations after config reload 
 * Tue May 19 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-5%{?dist}
