@@ -31,6 +31,7 @@ from argo_egi_consumer.config import ProxyConsumerConf
 
 import argparse
 import signal
+import socket
 import stomp
 import pwd
 import datetime
@@ -150,19 +151,17 @@ class Daemon:
 
         def sighupcleanup(signum, frame):
             log.info('Caught SIGHUP')
-            self.reader.load()
-            self.reader.listener.load()
-            self.reader.listener.writer.load()
-            log.info('Config reload')
+            for topic in self.reader.topics:
+                self.reader.conn.unsubscribe(destination=topic)
             try:
                 self.reader.conn.stop()
                 self.reader.conn.disconnect()
-            except stomp.exception.NotConnectedException:
-                self.reader.conn.start()
-                self.reader.conn.connect()
-                log.info('Subscribed to %s' % repr(self.reader.topics))
-                for topic in self.reader.topics:
-                    self.reader.conn.subscribe(destination=topic, ack='auto')
+            except (socket.error, stomp.exception.NotConnectedException):
+                self.reader.load()
+                self.reader.listener.load()
+                self.reader.listener.writer.load()
+                log.info('Config reload')
+                self.reader.connect()
 
         signal.signal(signal.SIGHUP, sighupcleanup)
 

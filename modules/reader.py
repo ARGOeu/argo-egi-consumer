@@ -140,7 +140,7 @@ class MessageReader:
                             use_ssl=self.useSSL,
                             ssl_key_file=self.SSLKey,
                             ssl_cert_file=self.SSLCertificate)
-        self.log.info("Cycle to broker %s:%i" % (self.msgServers[0][0], self.msgServers[0][1]))
+        self.log.info("Cycle to broker %s:%i" % (server[0], server[1]))
         self.msgServers.rotate(-1)
 
         self.conn.set_listener('TopicListener', self.listener)
@@ -148,8 +148,8 @@ class MessageReader:
         try:
             self.conn.start()
             self.conn.connect()
-            self.log.info('Subscribed to %s' % repr(self.listener.topics))
-            for topic in self.listener.topics:
+            self.log.info('Subscribed to %s' % repr(self.topics))
+            for topic in self.topics:
                 self.conn.subscribe(destination=topic, ack='auto')
             self.listener.connectedCounter = 100
         except:
@@ -159,8 +159,6 @@ class MessageReader:
 
 
     def run(self):
-        self.listener.topics = self.topics
-
         # loop
         self.listener.connectedCounter = 0
         loopCount = 0
