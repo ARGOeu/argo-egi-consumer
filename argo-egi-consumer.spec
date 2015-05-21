@@ -69,6 +69,7 @@ fi
 - added VO topic
 * Tue May 19 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-1%{?dist}
 - package and components renamed
+- removed plaintxt writer
 - refactored source code 
   https://github.com/ARGOeu/ARGO/issues/129
 - simplified configuration with case insensitive sections and options
