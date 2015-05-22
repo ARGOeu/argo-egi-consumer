@@ -95,15 +95,14 @@ class TopicListener(stomp.ConnectionListener):
                     key = splitLine[0]
                     value = splitLine[1]
                     fields[key] = value.decode('utf-8', 'replace')
+
+            self.writer.writeMessage(fields)
+            self.messagesWriten += 1
+
         except Exception as inst:
             self.connectedCounter = -1
             self.connected = False
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            traceback.print_tb(exc_traceback)
             self._log.error('Error parsing message: HEADERS: %s BODY: %s' % (headers, message))
-
-        self.writer.writeMessage(fields)
-        self.messagesWriten += 1
 
 
 class MessageReader:
