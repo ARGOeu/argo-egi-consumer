@@ -45,9 +45,9 @@ defaultFileLogPastDays = 1
 defaultFileLogFutureDays = 1
 
 class MessageWriter:
-    def __init__(self):
+    def __init__(self, config):
         self.log = ProxyMsgLogger()
-        self.conf = ProxyConsumerConf()
+        self.conf = ProxyConsumerConf(config)
         self.load()
 
     def load(self):

@@ -7,7 +7,7 @@ class AbstractConsumerConf(object):
 
 
 class ConsumerConf(AbstractConsumerConf):
-    def __init__(self):
+    def __init__(self, confile):
         self._options = {}
         self._args = {'Output': ['Directory', 'Filename', 'ErrorFilename'],
                       'General': ['AvroSchema', 'Debug', 'LogFaultyTimestamps', 'ReportWritMsgEveryHours'],
@@ -16,7 +16,7 @@ class ConsumerConf(AbstractConsumerConf):
                       'STOMP': ['TCPKeepAliveIdle', 'TCPKeepAliveInterval',
                                 'TCPKeepAliveProbes', 'ReconnectAttempts', 'UseSSL'],
                       'Brokers': ['Server']}
-        self._filename = '/etc/argo-egi-consumer/consumer.conf'
+        self._filename = confile
 
     def parse(self):
         config = ConfigParser.ConfigParser()
@@ -84,9 +84,9 @@ class ConsumerConf(AbstractConsumerConf):
 
 
 class ProxyConsumerConf(AbstractConsumerConf):
-    def __init__(self):
+    def __init__(self, config):
         if not getattr(self.__class__, 'shared_object', None):
-            self.__class__.shared_object = ConsumerConf()
+            self.__class__.shared_object = ConsumerConf(config)
 
     def parse(self):
         return self.__class__.shared_object.parse()

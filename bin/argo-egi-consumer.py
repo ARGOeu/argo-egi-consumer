@@ -35,32 +35,38 @@ import socket
 import stomp
 import pwd
 import datetime
+import hashlib
 import logging, pprint
 import sys, os, time, atexit
 
 # topis deamon defaults
-pidfile = '/var/run/argo-egi-consumer.pid'
+pidfile = '/var/run/argo-egi-consumer-%s.pid'
 daemonname = 'argo-egi-consumer'
 user = 'arstats'
-log = None
+conf, log = None, None
 
 class Daemon:
     def __init__(self, pidfile, stdin='/dev/null', stdout='/dev/null',
-                 stderr='/dev/null', name=daemonname):
+                 stderr='/dev/null', name=daemonname, nofork=True, config=None):
         self.name = name
         self.stdin = stdin
         self.stdout = stdout
         self.stderr = stderr
         self.pidfile = pidfile
+        self._configfile = config
+        self._nofork = nofork
 
-    def _daemonize(self, nofork):
-        if not nofork:
+    def _daemonize(self):
+        handler = logging.StreamHandler()
+        log.addHandler(handler)
+        if not self._nofork:
             try:
                 pid = os.fork()
                 if pid > 0:
                     raise SystemExit(0)
             except OSError, e:
                 log.error("fork #1 failed: %d (%s)\n" % (e.errno, e.strerror))
+                log.removeHandler(handler)
                 raise SystemExit(1)
 
             os.chdir("/")
@@ -70,6 +76,7 @@ class Daemon:
                 os.setsid()
             except OSError as e:
                 log.error('%s %s' % (str(self.__class__), e))
+                log.removeHandler(handler)
                 raise SystemExit(1)
 
             # do second fork
@@ -79,6 +86,7 @@ class Daemon:
                     raise SystemExit(0)
             except OSError, e:
                 log.error("fork #2 failed: %d (%s)\n" % (e.errno, e.strerror))
+                log.removeHandler(handler)
                 sys.exit(1)
 
             # redirect standard file descriptors
@@ -99,6 +107,7 @@ class Daemon:
             file(self.pidfile,'w+').write("%s\n" % pid)
         except (IOError, OSError) as e:
             log.error('%s %s' % (str(self.__class__), e))
+            log.removeHandler(handler)
             sys.exit(1)
 
         try:
@@ -108,15 +117,19 @@ class Daemon:
             os.seteuid(uinfo.pw_uid)
         except (OSError, IOError) as e:
             log.error('%s %s' % (str(self.__class__), e))
+            log.removeHandler(handler)
             raise SystemExit(1)
 
     def _delpid(self):
+        handler = logging.StreamHandler()
+        log.addHandler(handler)
         try:
             os.seteuid(0)
             os.setegid(0)
             os.remove(self.pidfile)
         except (IOError, OSError) as e:
             log.error('%s %s' % (str(self.__class__), e))
+            log.removeHandler(handler)
             raise SystemExit(1)
 
     def _is_pid_running(self, pid):
@@ -165,7 +178,7 @@ class Daemon:
 
         signal.signal(signal.SIGHUP, sighupcleanup)
 
-    def start(self, nofork):
+    def start(self):
         # Check for a pidfile to see if the daemon already runs
         try:
             pf = file(self.pidfile,'r')
@@ -184,7 +197,7 @@ class Daemon:
 
         self._setup_sighandlers()
         # Start the daemon
-        self._daemonize(nofork)
+        self._daemonize()
         self._run()
 
     def stop(self):
@@ -202,9 +215,9 @@ class Daemon:
         else:
             os.kill(pid, signal.SIGTERM)
 
-    def restart(self, nofork):
+    def restart(self):
         self.stop()
-        self.start(nofork)
+        self.start()
 
     def status(self):
         # Get the pid from the pidfile
@@ -234,12 +247,11 @@ class Daemon:
             return 3
 
     def _run(self):
-        self.reader = MessageReader()
+        self.reader = MessageReader(conf[0])
         log.info("Started")
         self.reader.run()
 
 def main():
-    daemon = Daemon(pidfile, name=daemonname)
     global log
     log = ProxyMsgLogger()
 
@@ -247,16 +259,23 @@ def main():
     parser.add_argument('--start', action='store_true')
     parser.add_argument('--stop', action='store_true')
     parser.add_argument('--restart', action='store_true')
+    parser.add_argument('--config', nargs=1, required=True)
     parser.add_argument('--nofork', action='store_true')
     parser.add_argument('--status', action='store_true')
     args = parser.parse_args()
 
+    global conf
+    conf = args.config
+    md = hashlib.md5()
+    md.update(conf[0])
+    daemon = Daemon(pidfile % md.hexdigest(), name=daemonname, nofork=args.nofork)
+
     if args.start:
-        daemon.start(args.nofork)
+        daemon.start()
     elif args.stop:
         daemon.stop()
     elif args.restart:
-        daemon.restart(args.nofork)
+        daemon.restart()
     elif args.status:
         daemon.status()
     else:

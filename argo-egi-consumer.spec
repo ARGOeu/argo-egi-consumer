@@ -1,7 +1,7 @@
 Name: argo-egi-consumer
 Summary: A/R Comp Engine message consumer
 Version: 1.4.0
-Release: 9%{?dist}
+Release: 10%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot
 Group:     EGI/SA4
@@ -50,6 +50,9 @@ if [ "$1" = 0 ] ; then
 fi
 
 %changelog
+* Fri May 22 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-10%{?dist}
+- catch failed writes
+- multi instance support
 * Wed May 20 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-9%{?dist}
 - python 2.6 has slightly different API for StreamHandler logger
 * Wed May 20 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-8%{?dist}

@@ -39,13 +39,13 @@ from argo_egi_consumer.config import ProxyConsumerConf
 
 
 class TopicListener(stomp.ConnectionListener):
-    def __init__(self):
+    def __init__(self, config):
         self._log = ProxyMsgLogger()
-        self.conf = ProxyConsumerConf()
+        self.conf = ProxyConsumerConf(config)
         self.connected = False
         self.connectedCounter = 100
         self.topic = None
-        self.writer = MessageWriter()
+        self.writer = MessageWriter(config)
         self.messagesWriten = 0
         self._ths = []
         self.load()
@@ -106,10 +106,10 @@ class TopicListener(stomp.ConnectionListener):
 
 
 class MessageReader:
-    def __init__(self):
+    def __init__(self, config):
         self.log = ProxyMsgLogger()
-        self.conf = ProxyConsumerConf()
-        self.listener = TopicListener()
+        self.conf = ProxyConsumerConf(config)
+        self.listener = TopicListener(config)
         self.reconnect = False
         self.load()
 
