@@ -28,6 +28,7 @@ import sys
 import json
 import logging
 import pprint
+import threading
 import stomp
 import datetime
 import json
@@ -48,6 +49,8 @@ class MessageWriter:
     def __init__(self, config):
         self.log = ProxyMsgLogger()
         self.conf = ProxyConsumerConf(config)
+        self._thevent = threading.Event()
+        self._thevent.clear()
         self.load()
 
     def load(self):
@@ -118,34 +121,38 @@ class MessageWriter:
             else:
                 msglist.append(msg)
 
-            schema = avro.schema.parse(open(self.avroSchema).read())
-            if path.exists(filename):
-                try:
-                    avroFile = open(filename, 'a+')
-                except (IOError, OSError) as e:
-                    self.log.error(e)
-                    raise SystemExit(1)
-                writer = DataFileWriter(avroFile, DatumWriter())
-            else:
-                try:
-                    avroFile = open(filename, 'w+')
-                except (IOError, OSError) as e:
-                    self.log.error(e)
-                    raise SystemExit(1)
-                writer = DataFileWriter(avroFile, DatumWriter(), schema)
+            if not self._thevent.isSet():
+                self._thevent.set()
 
-            if self.debugOutput:
-                plainfile = open(filename+'.DEBUG', 'a+')
+                schema = avro.schema.parse(open(self.avroSchema).read())
+                if path.exists(filename):
+                    try:
+                        avroFile = open(filename, 'a+')
+                    except (IOError, OSError) as e:
+                        self.log.error(e)
+                        raise SystemExit(1)
+                    writer = DataFileWriter(avroFile, DatumWriter())
+                else:
+                    try:
+                        avroFile = open(filename, 'w+')
+                    except (IOError, OSError) as e:
+                        self.log.error(e)
+                        raise SystemExit(1)
+                    writer = DataFileWriter(avroFile, DatumWriter(), schema)
 
-            for m in msglist:
-                writer.append(m)
                 if self.debugOutput:
-                    plainfile.write(json.dumps(m)+'\n')
+                    plainfile = open(filename+'.DEBUG', 'a+')
 
-            if self.debugOutput:
-                plainfile.close()
-            writer.close()
-            avroFile.close()
+                for m in msglist:
+                    writer.append(m)
+                    if self.debugOutput:
+                        plainfile.write(json.dumps(m)+'\n')
+
+                if self.debugOutput:
+                    plainfile.close()
+                writer.close()
+                avroFile.close()
+                self._thevent.clear()
 
     def createLogFilename(self, timestamp):
         if self.fileDirectory[-1] != '/':

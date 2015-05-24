@@ -37,7 +37,6 @@ from argo_egi_consumer.writer import MessageWriter
 from argo_egi_consumer.log import ProxyMsgLogger
 from argo_egi_consumer.config import ProxyConsumerConf
 
-
 class TopicListener(stomp.ConnectionListener):
     def __init__(self, config):
         self._log = ProxyMsgLogger()
@@ -64,7 +63,7 @@ class TopicListener(stomp.ConnectionListener):
                 break
 
     def on_connected(self, headers, body):
-        self._log.info('TopicListener connected, session %s' % headers['session'])
+        self._log.info('Listener connected, session %s' % headers['session'])
         self.connected = True
         self.connectedCounter = 100
         if self._ths:
@@ -75,7 +74,7 @@ class TopicListener(stomp.ConnectionListener):
         self._ths.append(t)
 
     def on_disconnected(self):
-        self._log.warning("TopicListener disconnected")
+        self._log.warning("Listener disconnected")
         self.connected = False
 
     def on_error(self, headers, message):
@@ -127,6 +126,7 @@ class MessageReader:
         self.SSLCertificate = self.conf.get_option('AuthenticationHostKey'.lower())
         self.SSLKey = self.conf.get_option('AuthenticationHostCert'.lower())
 
+
     def connect(self):
         # cycle msg server
         server = self.msgServers[0]
@@ -139,6 +139,7 @@ class MessageReader:
                             use_ssl=self.useSSL,
                             ssl_key_file=self.SSLKey,
                             ssl_cert_file=self.SSLCertificate)
+        #self.conn.override_threading(thread_create)
         self.log.info("Cycle to broker %s:%i" % (server[0], server[1]))
         self.msgServers.rotate(-1)
 
@@ -147,9 +148,9 @@ class MessageReader:
         try:
             self.conn.start()
             self.conn.connect()
-            self.log.info('Subscribed to %s' % repr(self.topics))
             for topic in self.topics:
                 self.conn.subscribe(destination=topic, ack='auto')
+            self.log.info('Subscribed to %s' % repr(self.topics))
             self.listener.connectedCounter = 100
         except:
             self.log.error('Connection to broker %s:%i failed after %i retries' % (server[0], server[1],
@@ -180,6 +181,7 @@ class MessageReader:
                         self.log.info('TopicListener did not receive any message in %s seconds' % self.listenerIdleTimeout)
 
             if self.reconnect:
+                self.connect()
                 self.connect()
 
             loopCount += 1
