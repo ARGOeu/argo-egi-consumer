@@ -37,7 +37,7 @@ from argo_egi_consumer.writer import MessageWriter
 from argo_egi_consumer.log import ProxyMsgLogger
 from argo_egi_consumer.config import ProxyConsumerConf
 
-class TopicListener(stomp.ConnectionListener):
+class DestListener(stomp.ConnectionListener):
     def __init__(self, config):
         self._log = ProxyMsgLogger()
         self.conf = ProxyConsumerConf(config)
@@ -108,7 +108,7 @@ class MessageReader:
     def __init__(self, config):
         self.log = ProxyMsgLogger()
         self.conf = ProxyConsumerConf(config)
-        self.listener = TopicListener(config)
+        self.listener = DestListener(config)
         self.reconnect = False
         self.load()
 
@@ -116,8 +116,8 @@ class MessageReader:
         self.conf.parse()
         self.msgServers = deque(self.conf.get_option('BrokerServer'.lower()))
         self.listenerIdleTimeout = int(self.conf.get_option('SubscriptionIdleMsgTimeout'.lower()))
-        ltopics = self.conf.get_option('SubscriptionDestinations'.lower()).split(',')
-        self.topics = [t.strip() for t in ltopics]
+        ldest = self.conf.get_option('SubscriptionDestinations'.lower()).split(',')
+        self.destinations = [t.strip() for t in ldest]
         self.useSSL = eval(self.conf.get_option('STOMPUseSSL'.lower()))
         self.keepaliveidle = int(self.conf.get_option('STOMPTCPKeepAliveIdle'.lower()))
         self.keepaliveint = int(self.conf.get_option('STOMPTCPKeepAliveInterval'.lower()))
@@ -139,18 +139,17 @@ class MessageReader:
                             use_ssl=self.useSSL,
                             ssl_key_file=self.SSLKey,
                             ssl_cert_file=self.SSLCertificate)
-        #self.conn.override_threading(thread_create)
         self.log.info("Cycle to broker %s:%i" % (server[0], server[1]))
         self.msgServers.rotate(-1)
 
-        self.conn.set_listener('TopicListener', self.listener)
+        self.conn.set_listener('DestListener', self.listener)
 
         try:
             self.conn.start()
             self.conn.connect()
-            for topic in self.topics:
-                self.conn.subscribe(destination=topic, ack='auto')
-            self.log.info('Subscribed to %s' % repr(self.topics))
+            for dest in self.destinations:
+                self.conn.subscribe(destination=dest, ack='auto')
+            self.log.info('Subscribed to %s' % repr(self.destinations))
             self.listener.connectedCounter = 100
         except:
             self.log.error('Connection to broker %s:%i failed after %i retries' % (server[0], server[1],
@@ -178,10 +177,9 @@ class MessageReader:
                         self.reconnect = True
                         loopCount = 0
                         self.listener.messagesWriten = 0
-                        self.log.info('TopicListener did not receive any message in %s seconds' % self.listenerIdleTimeout)
+                        self.log.info('Listener did not receive any message in %s seconds' % self.listenerIdleTimeout)
 
             if self.reconnect:
-                self.connect()
                 self.connect()
 
             loopCount += 1

@@ -164,8 +164,8 @@ class Daemon:
 
         def sighupcleanup(signum, frame):
             log.info('Caught SIGHUP')
-            for topic in self.reader.topics:
-                self.reader.conn.unsubscribe(destination=topic)
+            for dest in self.reader.destinations:
+                self.reader.conn.unsubscribe(destination=dest)
             try:
                 self.reader.conn.stop()
                 self.reader.conn.disconnect()

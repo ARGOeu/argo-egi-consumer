@@ -1,7 +1,7 @@
 Name: argo-egi-consumer
 Summary: A/R Comp Engine message consumer
 Version: 1.4.0
-Release: 10%{?dist}
+Release: 12%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot
 Group:     EGI/SA4
@@ -50,6 +50,11 @@ if [ "$1" = 0 ] ; then
 fi
 
 %changelog
+* Sun May 24 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-12%{?dist}
+- no topics in code, just destinations
+* Sun May 24 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-11%{?dist}
+- prevention of multiple threads writing to the same avro log
+  https://github.com/ARGOeu/ARGO/issues/135
 * Fri May 22 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-10%{?dist}
 - catch failed writes
 - multi instance support
