@@ -166,15 +166,12 @@ class Daemon:
             log.info('Caught SIGHUP')
             for dest in self.reader.destinations:
                 self.reader.conn.unsubscribe(destination=dest)
-            try:
-                self.reader.conn.stop()
-                self.reader.conn.disconnect()
-            except (socket.error, stomp.exception.NotConnectedException):
-                self.reader.load()
-                self.reader.listener.load()
-                self.reader.listener.writer.load()
-                log.info('Config reload')
-                self.reader.connect()
+
+            self.reader.load()
+            self.reader.listener.load()
+            self.reader.listener.writer.load()
+            log.info('Config reload')
+            self.reader.listener.connected = False
 
         signal.signal(signal.SIGHUP, sighupcleanup)
 

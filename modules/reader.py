@@ -28,6 +28,8 @@ import decimal
 import logging
 import os
 import stomp
+import socket
+import signal
 import sys
 import time
 import traceback
@@ -83,8 +85,6 @@ class DestListener(stomp.ConnectionListener):
             self.messagesWriten += 1
 
         except Exception as inst:
-            self.connectedCounter = -1
-            self.connected = False
             self._log.error('Error parsing message: HEADERS: %s BODY: %s' % (headers, message))
 
 
@@ -93,6 +93,7 @@ class MessageReader:
         self.log = ProxyMsgLogger()
         self.conf = ProxyConsumerConf(config)
         self.listener = DestListener(config)
+        self._listconns = []
         self.reconnect = False
         self._ths = []
         self.load()
@@ -127,6 +128,7 @@ class MessageReader:
                             ssl_key_file=self.SSLKey,
                             ssl_cert_file=self.SSLCertificate)
         self.log.info("Cycle to broker %s:%i" % (server[0], server[1]))
+        self._listconns.append(self.conn)
         self.msgServers.rotate(-1)
 
         self.conn.set_listener('DestListener', self.listener)
@@ -153,7 +155,6 @@ class MessageReader:
             else:
                 break
 
-
     def run(self):
         # loop
         self.listener.connectedCounter = 0
@@ -165,8 +166,7 @@ class MessageReader:
             #check connection
             if not self.listener.connected:
                 self.listener.connectedCounter -= 1
-                if self.listener.connectedCounter <= 0:
-                    self.reconnect = True
+                self.reconnect = True
 
             else:
                 if self.listenerIdleTimeout > 0 and loopCount >= self.listenerIdleTimeout:
@@ -185,6 +185,14 @@ class MessageReader:
                 t.start()
                 self._ths.append(t)
 
+                if self._listconns:
+                    for conn in self._listconns:
+                        try:
+                            conn.stop()
+                            conn.disconnect()
+                        except (socket.error, stomp.exception.NotConnectedException):
+                            self.listener.connected = False
+                    self._listconns = []
                 self.connect()
 
             loopCount += 1
