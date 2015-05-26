@@ -46,11 +46,10 @@ defaultFileLogPastDays = 1
 defaultFileLogFutureDays = 1
 
 class MessageWriter:
-    def __init__(self, config):
+    def __init__(self, config, thlock):
         self.log = ProxyMsgLogger()
         self.conf = ProxyConsumerConf(config)
-        self._thevent = threading.Event()
-        self._thevent.clear()
+        self._thlock = thlock
         self.load()
 
     def load(self):
@@ -121,38 +120,34 @@ class MessageWriter:
             else:
                 msglist.append(msg)
 
-            if not self._thevent.isSet():
-                self._thevent.set()
-
+            self._thlock.acquire(True)
+            try:
                 schema = avro.schema.parse(open(self.avroSchema).read())
                 if path.exists(filename):
-                    try:
-                        avroFile = open(filename, 'a+')
-                    except (IOError, OSError) as e:
-                        self.log.error(e)
-                        raise SystemExit(1)
+                    avroFile = open(filename, 'a+')
                     writer = DataFileWriter(avroFile, DatumWriter())
                 else:
-                    try:
-                        avroFile = open(filename, 'w+')
-                    except (IOError, OSError) as e:
-                        self.log.error(e)
-                        raise SystemExit(1)
+                    avroFile = open(filename, 'w+')
                     writer = DataFileWriter(avroFile, DatumWriter(), schema)
-
-                if self.debugOutput:
-                    plainfile = open(filename+'.DEBUG', 'a+')
 
                 for m in msglist:
                     writer.append(m)
-                    if self.debugOutput:
-                        plainfile.write(json.dumps(m)+'\n')
 
-                if self.debugOutput:
-                    plainfile.close()
                 writer.close()
                 avroFile.close()
-                self._thevent.clear()
+
+                if self.debugOutput:
+                    plainfile = open(filename+'.DEBUG', 'a+')
+                    plainfile.write(json.dumps(m)+'\n')
+                    plainfile.close()
+
+            except (IOError, OSError) as e:
+                self.log.error(e)
+                raise SystemExit(1)
+
+            finally:
+                self._thlock.release()
+
 
     def createLogFilename(self, timestamp):
         if self.fileDirectory[-1] != '/':

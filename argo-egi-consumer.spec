@@ -1,7 +1,7 @@
 Name: argo-egi-consumer
 Summary: A/R Comp Engine message consumer
 Version: 1.4.0
-Release: 12%{?dist}
+Release: 13%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot
 Group:     EGI/SA4
@@ -50,6 +50,8 @@ if [ "$1" = 0 ] ; then
 fi
 
 %changelog
+* Tue May 26 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-13%{?dist}
+- prevent race condition on avro log writing, second try 
 * Sun May 24 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-12%{?dist}
 - no topics in code, just destinations
 * Sun May 24 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-11%{?dist}

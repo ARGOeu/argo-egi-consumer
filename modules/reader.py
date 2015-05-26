@@ -37,41 +37,25 @@ from argo_egi_consumer.writer import MessageWriter
 from argo_egi_consumer.log import ProxyMsgLogger
 from argo_egi_consumer.config import ProxyConsumerConf
 
+thlock = threading.Lock()
+
 class DestListener(stomp.ConnectionListener):
     def __init__(self, config):
         self._log = ProxyMsgLogger()
         self.conf = ProxyConsumerConf(config)
         self.connected = False
         self.connectedCounter = 100
-        self.topic = None
-        self.writer = MessageWriter(config)
+        self.writer = MessageWriter(config, thlock)
         self.messagesWriten = 0
-        self._ths = []
         self.load()
 
     def load(self):
-        self._hours = self.conf.get_option('GeneralReportWritMsgEveryHours'.lower(), optional=True)
-        self._infowrittmsg_everysec = 60*60*int(self._hours) if self._hours else 60*60*24
-
-    def _deferwritmsgreport(self, e):
-        while True:
-            time.sleep(self._infowrittmsg_everysec)
-            if self.connected and not e.isSet():
-                self._log.info('Written %i messages in %s hours' % (self.messagesWriten, self._hours))
-                self.messagesWriten = 0
-            else:
-                break
+        pass
 
     def on_connected(self, headers, body):
         self._log.info('Listener connected, session %s' % headers['session'])
         self.connected = True
         self.connectedCounter = 100
-        if self._ths:
-            self._e.set()
-        self._e = threading.Event()
-        t = threading.Thread(target=self._deferwritmsgreport, args=(self._e,))
-        t.start()
-        self._ths.append(t)
 
     def on_disconnected(self):
         self._log.warning("Listener disconnected")
@@ -110,6 +94,7 @@ class MessageReader:
         self.conf = ProxyConsumerConf(config)
         self.listener = DestListener(config)
         self.reconnect = False
+        self._ths = []
         self.load()
 
     def load(self):
@@ -125,6 +110,8 @@ class MessageReader:
         self.reconnects = int(self.conf.get_option('STOMPReconnectAttempts'.lower()))
         self.SSLCertificate = self.conf.get_option('AuthenticationHostKey'.lower())
         self.SSLKey = self.conf.get_option('AuthenticationHostCert'.lower())
+        self._hours = self.conf.get_option('GeneralReportWritMsgEveryHours'.lower(), optional=True)
+        self._infowrittmsg_everysec = 60*60*int(self._hours) if self._hours else 60*60*24
 
 
     def connect(self):
@@ -156,6 +143,16 @@ class MessageReader:
                                                                             self.reconnects))
             self.listener.connectedCounter = 10
 
+    def _deferwritmsgreport(self, e):
+        while True:
+            time.sleep(self._infowrittmsg_everysec)
+            if self.listener.connected and not e.isSet():
+                self.log.info('Written %i messages in %s hours' %
+                              (self.listener.messagesWriten, self._hours))
+                self.listener.messagesWriten = 0
+            else:
+                break
+
 
     def run(self):
         # loop
@@ -180,8 +177,15 @@ class MessageReader:
                         self.log.info('Listener did not receive any message in %s seconds' % self.listenerIdleTimeout)
 
             if self.reconnect:
+                if self._ths:
+                    self._e.set()
+                self._e = threading.Event()
+                t = threading.Thread(target=self._deferwritmsgreport, args=(self._e,))
+                t.daemon = True
+                t.start()
+                self._ths.append(t)
+
                 self.connect()
 
             loopCount += 1
             time.sleep(1)
-
