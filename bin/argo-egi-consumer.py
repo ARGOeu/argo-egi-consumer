@@ -157,7 +157,7 @@ class Daemon:
                         if os.path.exists(self.pidfile):
                             os.remove(self.pidfile)
                     else:
-                        self.log.error(err)
+                        log.error(err)
                         raise SystemExit(1)
 
         signal.signal(signal.SIGTERM, sigtermcleanup)
