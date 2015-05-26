@@ -52,6 +52,7 @@ fi
 %changelog
 * Tue May 26 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-14%{?dist}
 - fix multiple connections issues
+- plaintext output option instead of debug
 * Tue May 26 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-13%{?dist}
 - prevent race condition on avro log writing, second try 
 * Sun May 24 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-12%{?dist}

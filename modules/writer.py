@@ -31,7 +31,6 @@ import pprint
 import threading
 import stomp
 import datetime
-import json
 import os
 from os import path
 from argo_egi_consumer.log import ProxyMsgLogger
@@ -59,7 +58,7 @@ class MessageWriter:
         self.filenameTemplate =  self.conf.get_option('OutputFilename'.lower())
         self.errorFilenameTemplate =  self.conf.get_option('OutputErrorFilename'.lower())
         self.avroSchema = self.conf.get_option('GeneralAvroSchema'.lower())
-        self.debugOutput = eval(self.conf.get_option('GeneralDebug'.lower()))
+        self.txtOutput = eval(self.conf.get_option('OutputWritePlaintext'.lower()))
         self.fileLogPastDays = defaultFileLogPastDays
         self.fileLogFutureDays = defaultFileLogFutureDays
         self.errorLogFaultyTimestamps = eval(self.conf.get_option('GeneralLogFaultyTimestamps'.lower()))
@@ -136,8 +135,8 @@ class MessageWriter:
                 writer.close()
                 avroFile.close()
 
-                if self.debugOutput:
-                    plainfile = open(filename+'.DEBUG', 'a+')
+                if self.txtOutput:
+                    plainfile = open(filename+'.TXT', 'a+')
                     plainfile.write(json.dumps(m)+'\n')
                     plainfile.close()
 
