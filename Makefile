@@ -1,6 +1,5 @@
-PKGNAME=ar-consumer
+PKGNAME=argo-egi-consumer
 SPECFILE=${PKGNAME}.spec
-FILES=Makefile ${SPECFILE} 
 
 PKGVERSION=$(shell grep -s '^Version:' $(SPECFILE) | sed -e 's/Version: *//')
 
@@ -12,14 +11,13 @@ rpm: dist
 
 dist:
 	rm -rf dist
-	mkdir -p dist/${PKGNAME}-${PKGVERSION}
-	cp -pr ${FILES} setup.py etc bin init.d arconsumer dist/${PKGNAME}-${PKGVERSION}/.
-	cd dist ; tar cfz ../${PKGNAME}-${PKGVERSION}.tar.gz ${PKGNAME}-${PKGVERSION}
+	python setup.py sdist
+	mv dist/${PKGNAME}-${PKGVERSION}.tar.gz .
 	rm -rf dist
 
 sources: dist
 
 clean:
 	rm -rf ${PKGNAME}-${PKGVERSION}.tar.gz
+	rm -f MANIFEST
 	rm -rf dist
-
