@@ -1,7 +1,7 @@
 Name: argo-egi-consumer
 Summary: A/R Comp Engine message consumer
 Version: 1.4.0
-Release: 14%{?dist}
+Release: 15%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot
 Group:     EGI/SA4
@@ -50,6 +50,9 @@ if [ "$1" = 0 ] ; then
 fi
 
 %changelog
+* Fri May 29 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-15%{?dist}
+- remove double minuses in init script arguments
+  https://github.com/ARGOeu/ARGO/issues/138
 * Tue May 26 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-14%{?dist}
 - fix multiple connections issues
   https://github.com/ARGOeu/ARGO/issues/137
