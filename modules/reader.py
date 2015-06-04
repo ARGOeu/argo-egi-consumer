@@ -94,13 +94,20 @@ class MessageReader:
         self.conf = ProxyConsumerConf(config)
         self.listener = DestListener(config)
         self._listconns = []
-        self.reconnect = False
         self._ths = []
+        self._wastupleserv = None
+        self._reconnconfreload = False
         self.load()
 
     def load(self):
         self.conf.parse()
-        self.msgServers = deque(self.conf.get_option('BrokerServer'.lower()))
+        tupleserv = self.conf.get_option('BrokerServer'.lower())
+        if self._wastupleserv and tupleserv != self._wastupleserv:
+            self._reconnconfreload = True
+        else:
+            self._reconnconfreload = False
+        self._wastupleserv = tupleserv
+        self.msgServers = deque(tupleserv)
         self.listenerIdleTimeout = int(self.conf.get_option('SubscriptionIdleMsgTimeout'.lower()))
         ldest = self.conf.get_option('SubscriptionDestinations'.lower()).split(',')
         self.destinations = [t.strip() for t in ldest]
@@ -113,7 +120,6 @@ class MessageReader:
         self.SSLKey = self.conf.get_option('AuthenticationHostCert'.lower())
         self._hours = self.conf.get_option('GeneralReportWritMsgEveryHours'.lower(), optional=True)
         self._infowrittmsg_everysec = 60*60*int(self._hours) if self._hours else 60*60*24
-
 
     def connect(self):
         # cycle msg server
@@ -178,7 +184,7 @@ class MessageReader:
                         self.listener.messagesWriten = 0
                         self.log.info('Listener did not receive any message in %s seconds' % self.listenerIdleTimeout)
 
-            if self.reconnect:
+            if self.reconnect or self._reconnconfreload:
                 if self._listconns:
                     for conn in self._listconns:
                         try:
@@ -186,6 +192,7 @@ class MessageReader:
                             conn.disconnect()
                         except (socket.error, stomp.exception.NotConnectedException):
                             self.listener.connected = False
+                            self._reconnconfreload = False
                     self._listconns = []
                 self.connect()
 

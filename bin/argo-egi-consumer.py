@@ -164,14 +164,10 @@ class Daemon:
 
         def sighupcleanup(signum, frame):
             log.info('Caught SIGHUP')
-            for dest in self.reader.destinations:
-                self.reader.conn.unsubscribe(destination=dest)
-
             self.reader.load()
             self.reader.listener.load()
             self.reader.listener.writer.load()
             log.info('Config reload')
-            self.reader.listener.connected = False
 
         signal.signal(signal.SIGHUP, sighupcleanup)
 
