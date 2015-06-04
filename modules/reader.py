@@ -145,20 +145,22 @@ class MessageReader:
                                                                             self.reconnects))
             self.listener.connectedCounter = 10
 
-    def _deferwritmsgreport(self, e):
+    def _deferwritmsgreport(self):
         while True:
             time.sleep(self._infowrittmsg_everysec)
-            if self.listener.connected and not e.isSet():
+            if self.listener.connected:
                 self.log.info('Written %i messages in %s hours' %
                               (self.listener.messagesWriten, self._hours))
                 self.listener.messagesWriten = 0
-            else:
-                break
 
     def run(self):
         # loop
         self.listener.connectedCounter = 0
         loopCount = 0
+
+        t = threading.Thread(target=self._deferwritmsgreport, name='msgwritreport_thread')
+        t.daemon = True
+        t.start()
 
         while True:
             self.reconnect = False
@@ -177,14 +179,6 @@ class MessageReader:
                         self.log.info('Listener did not receive any message in %s seconds' % self.listenerIdleTimeout)
 
             if self.reconnect:
-                if self._ths:
-                    self._e.set()
-                self._e = threading.Event()
-                t = threading.Thread(target=self._deferwritmsgreport, args=(self._e,))
-                t.daemon = True
-                t.start()
-                self._ths.append(t)
-
                 if self._listconns:
                     for conn in self._listconns:
                         try:
