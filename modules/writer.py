@@ -23,45 +23,71 @@
 # the EGI-InSPIRE project through the European Commission's 7th
 # Framework Programme (contract # INFSO-RI-261323)
 
-import time
-import sys
+import avro.schema
+import datetime
 import json
 import logging
-import pprint
-import threading
-import stomp
-import datetime
 import os
-from os import path
-from argo_egi_consumer.log import ProxyMsgLogger
-from argo_egi_consumer.config import ProxyConsumerConf
-import avro.schema
+import pprint
+import stomp
+import sys
+import threading
+import time
+
+from argo_egi_consumer.shared import SingletonShared as Shared
 from avro.datafile import DataFileReader
 from avro.datafile import DataFileWriter
 from avro.io import DatumReader
 from avro.io import DatumWriter
+from os import path
 
 defaultFileLogPastDays = 1
 defaultFileLogFutureDays = 1
+daemonname = 'argo-egi-consumer'
+LOGFORMAT = '%(name)s[%(process)s]: %(message)s'
+
+sh = Shared()
+
+class MsgLogger:
+    def __init__(self):
+        formatter = logging.Formatter(LOGFORMAT)
+        self.mylog = logging.getLogger(daemonname)
+        self.mylog.setLevel(logging.DEBUG)
+        handler = logging.handlers.SysLogHandler('/dev/log')
+        handler.setFormatter(formatter)
+        self.mylog.addHandler(handler)
+
+    def error(self, msg):
+        self.mylog.error(msg)
+
+    def info(self, msg):
+        self.mylog.info(msg)
+
+    def warning(self, msg):
+        self.mylog.warning(msg)
+
+    def addHandler(self, hdlr):
+        self.mylog.addHandler(hdlr)
+
+    def removeHandler(self, hdlr):
+        self.mylog.removeHandler(hdlr)
+
 
 class MessageWriter:
-    def __init__(self, config, thlock):
-        self.log = ProxyMsgLogger()
-        self.conf = ProxyConsumerConf(config)
-        self._thlock = thlock
+    def __init__(self):
         self.load()
 
     def load(self):
-        self.conf.parse()
+        sh.ConsumerConf.parse()
         self.dateFormat = '%Y-%m-%dT%H:%M:%SZ'
-        self.fileDirectory = self.conf.get_option('OutputDirectory'.lower())
-        self.filenameTemplate =  self.conf.get_option('OutputFilename'.lower())
-        self.errorFilenameTemplate =  self.conf.get_option('OutputErrorFilename'.lower())
-        self.avroSchema = self.conf.get_option('GeneralAvroSchema'.lower())
-        self.txtOutput = eval(self.conf.get_option('OutputWritePlaintext'.lower()))
+        self.fileDirectory = sh.ConsumerConf.get_option('OutputDirectory'.lower())
+        self.filenameTemplate =  sh.ConsumerConf.get_option('OutputFilename'.lower())
+        self.errorFilenameTemplate =  sh.ConsumerConf.get_option('OutputErrorFilename'.lower())
+        self.avroSchema = sh.ConsumerConf.get_option('GeneralAvroSchema'.lower())
+        self.txtOutput = eval(sh.ConsumerConf.get_option('OutputWritePlaintext'.lower()))
         self.fileLogPastDays = defaultFileLogPastDays
         self.fileLogFutureDays = defaultFileLogFutureDays
-        self.errorLogFaultyTimestamps = eval(self.conf.get_option('GeneralLogFaultyTimestamps'.lower()))
+        self.errorLogFaultyTimestamps = eval(sh.ConsumerConf.get_option('GeneralLogFaultyTimestamps'.lower()))
 
     def writeMessage(self, fields):
         msgOk = False
@@ -119,7 +145,7 @@ class MessageWriter:
             else:
                 msglist.append(msg)
 
-            self._thlock.acquire(True)
+            sh.thlock.acquire(True)
             try:
                 schema = avro.schema.parse(open(self.avroSchema).read())
                 if path.exists(filename):
@@ -141,11 +167,11 @@ class MessageWriter:
                     plainfile.close()
 
             except (IOError, OSError) as e:
-                self.log.error(e)
+                sh.Logger.error(e)
                 raise SystemExit(1)
 
             finally:
-                self._thlock.release()
+                sh.thlock.release()
 
 
     def createLogFilename(self, timestamp):

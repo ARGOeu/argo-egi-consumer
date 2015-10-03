@@ -1,16 +1,12 @@
 import ConfigParser
 import os, re, errno
 import logging
-from argo_egi_consumer.log import ProxyMsgLogger
+from argo_egi_consumer.shared import SingletonShared as Shared
 
-class AbstractConsumerConf(object):
-    def get_option(self, opt, optional=False):
-        pass
+sh = Shared()
 
-
-class ConsumerConf(AbstractConsumerConf):
+class ConsumerConf:
     def __init__(self, confile):
-        self.log = ProxyMsgLogger()
         self._options = {}
         self._args = {'Output': ['Directory', 'Filename', 'ErrorFilename', 'WritePlaintext'],
                       'General': ['AvroSchema', 'Debug', 'LogFaultyTimestamps', 'ReportWritMsgEveryHours'],
@@ -24,7 +20,7 @@ class ConsumerConf(AbstractConsumerConf):
     def parse(self):
         config = ConfigParser.ConfigParser()
         if not os.path.exists(self._filename):
-            self.log.error(repr(self.__class__) + ' Could not find %s ' % self._filename)
+            sh.Logger.error(repr(self.__class__) + ' Could not find %s ' % self._filename)
             raise SystemExit(1)
         config.read(self._filename)
 
@@ -38,10 +34,10 @@ class ConsumerConf(AbstractConsumerConf):
                                     optget = config.get(section, o)
                                     self._options.update({(sect+o).lower(): optget})
         except ConfigParser.NoOptionError as e:
-            self.log.error(repr(self.__class__) + " No option '%s' in section: '%s' " % (e.args[0], e.args[1]))
+            sh.Logger.error(repr(self.__class__) + " No option '%s' in section: '%s' " % (e.args[0], e.args[1]))
             raise SystemExit(1)
         except ConfigParser.NoSectionError as e:
-            self.log.error(repr(self.__class__) + "No section '%s' defined" % (e.args[0]))
+            sh.Logger.error(repr(self.__class__) + "No section '%s' defined" % (e.args[0]))
             raise SystemExit(1)
 
     def get_option(self, opt, optional=False):
@@ -56,7 +52,7 @@ class ConsumerConf(AbstractConsumerConf):
                         sortbrokers = sorted(bn, key=lambda s:
                                             int(re.search("(server)([0-9]*)", s).group(2)))
                     except ValueError, IndexError:
-                        self.log.error(repr(self.__class__) + " List of broker servers should be enumerated")
+                        sh.Logger.error(repr(self.__class__) + " List of broker servers should be enumerated")
                         raise SystemExit(1)
                 else:
                     sortbrokers = bn
@@ -64,7 +60,7 @@ class ConsumerConf(AbstractConsumerConf):
                 for brokopt in sortbrokers:
                     value = self._options[brokopt]
                     if ':' not in value:
-                        self.log.error(repr(self.__class__) + " Port should be specified for %s" % value)
+                        sh.Logger.error(repr(self.__class__) + " Port should be specified for %s" % value)
                         port = 6163
                         server = value
                     else:
@@ -78,19 +74,7 @@ class ConsumerConf(AbstractConsumerConf):
 
         except KeyError as e:
             if not optional:
-                self.log.error(repr(self.__class__) + " No option %s defined" % e)
+                sh.Logger.error(repr(self.__class__) + " No option %s defined" % e)
                 raise SystemExit(1)
             else:
                 return None
-
-
-class ProxyConsumerConf(AbstractConsumerConf):
-    def __init__(self, config):
-        if not getattr(self.__class__, 'shared_object', None):
-            self.__class__.shared_object = ConsumerConf(config)
-
-    def parse(self):
-        return self.__class__.shared_object.parse()
-
-    def get_option(self, opt, optional=False):
-        return self.__class__.shared_object.get_option(opt, optional)

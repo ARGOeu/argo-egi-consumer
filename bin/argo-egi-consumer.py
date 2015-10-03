@@ -26,47 +26,49 @@
 
 from argo_egi_consumer.reader import MessageReader
 from argo_egi_consumer.writer import MessageWriter
-from argo_egi_consumer.log import ProxyMsgLogger
-from argo_egi_consumer.config import ProxyConsumerConf
+from argo_egi_consumer.writer import MsgLogger
+from argo_egi_consumer.shared import SingletonShared as Shared
+from argo_egi_consumer.config import ConsumerConf
 
 import argparse
+import datetime
+import hashlib
+import logging, logging.handlers
+import pwd
 import signal
 import socket
 import stomp
-import pwd
-import datetime
-import hashlib
-import logging, pprint
 import sys, os, time, atexit
+import threading
 
-# topis deamon defaults
+# topic deamon defaults
 pidfile = '/var/run/argo-egi-consumer-%s.pid'
 daemonname = 'argo-egi-consumer'
 user = 'arstats'
 conf, log = None, None
+sh = Shared()
 
 class Daemon:
     def __init__(self, pidfile, stdin='/dev/null', stdout='/dev/null',
-                 stderr='/dev/null', name=daemonname, nofork=True, config=None):
+                 stderr='/dev/null', name=daemonname, nofork=True):
         self.name = name
         self.stdin = stdin
         self.stdout = stdout
         self.stderr = stderr
         self.pidfile = pidfile
-        self._configfile = config
         self._nofork = nofork
 
     def _daemonize(self):
         handler = logging.StreamHandler()
-        log.addHandler(handler)
+        sh.Logger.addHandler(handler)
         if not self._nofork:
             try:
                 pid = os.fork()
                 if pid > 0:
                     raise SystemExit(0)
             except OSError, e:
-                log.error("fork #1 failed: %d (%s)\n" % (e.errno, e.strerror))
-                log.removeHandler(handler)
+                sh.Logger.error("fork #1 failed: %d (%s)\n" % (e.errno, e.strerror))
+                sh.Logger.removeHandler(handler)
                 raise SystemExit(1)
 
             os.chdir("/")
@@ -75,8 +77,8 @@ class Daemon:
                 # decouple from parent environment
                 os.setsid()
             except OSError as e:
-                log.error('%s %s' % (str(self.__class__), e))
-                log.removeHandler(handler)
+                sh.Logger.error('%s %s' % (str(self.__class__), e))
+                sh.Logger.removeHandler(handler)
                 raise SystemExit(1)
 
             # do second fork
@@ -85,8 +87,8 @@ class Daemon:
                 if pid > 0:
                     raise SystemExit(0)
             except OSError, e:
-                log.error("fork #2 failed: %d (%s)\n" % (e.errno, e.strerror))
-                log.removeHandler(handler)
+                sh.Logger.error("fork #2 failed: %d (%s)\n" % (e.errno, e.strerror))
+                sh.Logger.removeHandler(handler)
                 sys.exit(1)
 
             # redirect standard file descriptors
@@ -106,8 +108,8 @@ class Daemon:
         try:
             file(self.pidfile,'w+').write("%s\n" % pid)
         except (IOError, OSError) as e:
-            log.error('%s %s' % (str(self.__class__), e))
-            log.removeHandler(handler)
+            sh.Logger.error('%s %s' % (str(self.__class__), e))
+            sh.Logger.removeHandler(handler)
             sys.exit(1)
 
         try:
@@ -116,20 +118,20 @@ class Daemon:
             os.setegid(uinfo.pw_gid)
             os.seteuid(uinfo.pw_uid)
         except (OSError, IOError) as e:
-            log.error('%s %s' % (str(self.__class__), e))
-            log.removeHandler(handler)
+            sh.Logger.error('%s %s' % (str(self.__class__), e))
+            sh.Logger.removeHandler(handler)
             raise SystemExit(1)
 
     def _delpid(self):
         handler = logging.StreamHandler()
-        log.addHandler(handler)
+        sh.Logger.addHandler(handler)
         try:
             os.seteuid(0)
             os.setegid(0)
             os.remove(self.pidfile)
         except (IOError, OSError) as e:
-            log.error('%s %s' % (str(self.__class__), e))
-            log.removeHandler(handler)
+            sh.Logger.error('%s %s' % (str(self.__class__), e))
+            sh.Logger.removeHandler(handler)
             raise SystemExit(1)
 
     def _is_pid_running(self, pid):
@@ -141,12 +143,12 @@ class Daemon:
 
     def _setup_sighandlers(self):
         def sigtermcleanup(signum, frame):
-            log.info('Caught SIGTERM')
+            sh.Logger.info('Caught SIGTERM')
             try:
                 self.reader.conn.stop()
                 self.reader.conn.disconnect()
             except stomp.exception.NotConnectedException:
-                log.info('Ended')
+                sh.Logger.info('Ended')
                 try:
                     while 1:
                         raise SystemExit(0)
@@ -157,17 +159,17 @@ class Daemon:
                         if os.path.exists(self.pidfile):
                             os.remove(self.pidfile)
                     else:
-                        log.error(err)
+                        sh.Logger.error(err)
                         raise SystemExit(1)
 
         signal.signal(signal.SIGTERM, sigtermcleanup)
 
         def sighupcleanup(signum, frame):
-            log.info('Caught SIGHUP')
+            sh.Logger.info('Caught SIGHUP')
             self.reader.load()
             self.reader.listener.load()
             self.reader.listener.writer.load()
-            log.info('Config reload')
+            sh.Logger.info('Config reload')
 
         signal.signal(signal.SIGHUP, sighupcleanup)
 
@@ -183,7 +185,7 @@ class Daemon:
         if pid:
             if self._is_pid_running(pid):
                 message = "pidfile %s already exist. Daemon already running?\n"
-                log.error(message)
+                sh.Logger.error(message)
                 sys.exit(1)
             else:
                 self._delpid
@@ -203,7 +205,7 @@ class Daemon:
 
         if not pid:
             message = "pidfile %s does not exist. Daemon not running?\n"
-            log.error(message)
+            sh.Logger.error(message)
             return # not an error in a restart
         else:
             os.kill(pid, signal.SIGTERM)
@@ -216,7 +218,7 @@ class Daemon:
         # Get the pid from the pidfile
         handler = logging.StreamHandler()
         global log
-        log.addHandler(handler)
+        sh.Logger.addHandler(handler)
         try:
             pf = file(self.pidfile,'r')
             pid = int(pf.read().strip())
@@ -226,27 +228,28 @@ class Daemon:
 
         if pid:
             if self._is_pid_running(pid):
-                log.info("%i is running..." % (pid))
-                log.removeHandler(handler)
+                sh.Logger.info("%i is running..." % (pid))
+                sh.Logger.removeHandler(handler)
                 return 0
             else:
-                log.info("Stopped")
-                log.removeHandler(handler)
+                sh.Logger.info("Stopped")
+                sh.Logger.removeHandler(handler)
                 return 3
 
         else:
-            log.info("Stopped")
-            log.removeHandler(handler)
+            sh.Logger.info("Stopped")
+            sh.Logger.removeHandler(handler)
             return 3
 
     def _run(self):
-        self.reader = MessageReader(conf[0])
-        log.info("Started")
+        self.reader = MessageReader()
+        sh.Logger.info("Started")
         self.reader.run()
 
 def main():
-    global log
-    log = ProxyMsgLogger()
+    sh.seta('thlock', threading.Lock())
+    sh.seta('Logger', MsgLogger())
+    sh.seta('nummsg', 0)
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--start', action='store_true')
@@ -259,6 +262,7 @@ def main():
 
     global conf
     conf = args.config
+    sh.seta('ConsumerConf', ConsumerConf(conf[0]))
     md = hashlib.md5()
     md.update(conf[0])
     daemon = Daemon(pidfile % md.hexdigest(), name=daemonname, nofork=args.nofork)

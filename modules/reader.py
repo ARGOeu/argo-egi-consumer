@@ -36,35 +36,30 @@ import traceback
 import threading
 from collections import deque
 from argo_egi_consumer.writer import MessageWriter
-from argo_egi_consumer.log import ProxyMsgLogger
-from argo_egi_consumer.config import ProxyConsumerConf
+from argo_egi_consumer.shared import SingletonShared as Shared
 
-thlock = threading.Lock()
+sh = Shared()
 
 class DestListener(stomp.ConnectionListener):
-    def __init__(self, config):
-        self._log = ProxyMsgLogger()
-        self.conf = ProxyConsumerConf(config)
+    def __init__(self):
         self.connected = False
         self.connectedCounter = 100
-        self.writer = MessageWriter(config, thlock)
-        self.messagesWriten = 0
-        self.load()
+        self.writer = MessageWriter()
 
     def load(self):
         pass
 
     def on_connected(self, headers, body):
-        self._log.info('Listener connected, session %s' % headers['session'])
+        sh.Logger.info('Listener connected, session %s' % headers['session'])
         self.connected = True
         self.connectedCounter = 100
 
     def on_disconnected(self):
-        self._log.warning("Listener disconnected")
+        sh.Logger.warning("Listener disconnected")
         self.connected = False
 
     def on_error(self, headers, message):
-        self._log.error("Received error %s" % message)
+        sh.Logger.error("Received error %s" % message)
 
     def on_message(self, headers, message):
         lines = message.split('\n')
@@ -82,17 +77,15 @@ class DestListener(stomp.ConnectionListener):
                     fields[key] = value.decode('utf-8', 'replace')
 
             self.writer.writeMessage(fields)
-            self.messagesWriten += 1
+            sh.nummsg += 1
 
         except Exception as inst:
-            self._log.error('Error parsing message: HEADERS: %s BODY: %s' % (headers, message))
+            sh.Logger.error('Error parsing message: HEADERS: %s BODY: %s' % (headers, message))
 
 
 class MessageReader:
-    def __init__(self, config):
-        self.log = ProxyMsgLogger()
-        self.conf = ProxyConsumerConf(config)
-        self.listener = DestListener(config)
+    def __init__(self):
+        self.listener = DestListener()
         self._listconns = []
         self._ths = []
         self._wastupleserv = None
@@ -100,25 +93,25 @@ class MessageReader:
         self.load()
 
     def load(self):
-        self.conf.parse()
-        tupleserv = self.conf.get_option('BrokerServer'.lower())
+        sh.ConsumerConf.parse()
+        tupleserv = sh.ConsumerConf.get_option('BrokerServer'.lower())
         if self._wastupleserv and tupleserv != self._wastupleserv:
             self._reconnconfreload = True
         else:
             self._reconnconfreload = False
         self._wastupleserv = tupleserv
         self.msgServers = deque(tupleserv)
-        self.listenerIdleTimeout = int(self.conf.get_option('SubscriptionIdleMsgTimeout'.lower()))
-        ldest = self.conf.get_option('SubscriptionDestinations'.lower()).split(',')
+        self.listenerIdleTimeout = int(sh.ConsumerConf.get_option('SubscriptionIdleMsgTimeout'.lower()))
+        ldest = sh.ConsumerConf.get_option('SubscriptionDestinations'.lower()).split(',')
         self.destinations = [t.strip() for t in ldest]
-        self.useSSL = eval(self.conf.get_option('STOMPUseSSL'.lower()))
-        self.keepaliveidle = int(self.conf.get_option('STOMPTCPKeepAliveIdle'.lower()))
-        self.keepaliveint = int(self.conf.get_option('STOMPTCPKeepAliveInterval'.lower()))
-        self.keepaliveprobes = int(self.conf.get_option('STOMPTCPKeepAliveProbes'.lower()))
-        self.reconnects = int(self.conf.get_option('STOMPReconnectAttempts'.lower()))
-        self.SSLCertificate = self.conf.get_option('AuthenticationHostKey'.lower())
-        self.SSLKey = self.conf.get_option('AuthenticationHostCert'.lower())
-        self._hours = self.conf.get_option('GeneralReportWritMsgEveryHours'.lower(), optional=True)
+        self.useSSL = eval(sh.ConsumerConf.get_option('STOMPUseSSL'.lower()))
+        self.keepaliveidle = int(sh.ConsumerConf.get_option('STOMPTCPKeepAliveIdle'.lower()))
+        self.keepaliveint = int(sh.ConsumerConf.get_option('STOMPTCPKeepAliveInterval'.lower()))
+        self.keepaliveprobes = int(sh.ConsumerConf.get_option('STOMPTCPKeepAliveProbes'.lower()))
+        self.reconnects = int(sh.ConsumerConf.get_option('STOMPReconnectAttempts'.lower()))
+        self.SSLCertificate = sh.ConsumerConf.get_option('AuthenticationHostKey'.lower())
+        self.SSLKey = sh.ConsumerConf.get_option('AuthenticationHostCert'.lower())
+        self._hours = sh.ConsumerConf.get_option('GeneralReportWritMsgEveryHours'.lower(), optional=True)
         self._infowrittmsg_everysec = 60*60*int(self._hours) if self._hours else 60*60*24
 
     def connect(self):
@@ -133,7 +126,7 @@ class MessageReader:
                             use_ssl=self.useSSL,
                             ssl_key_file=self.SSLKey,
                             ssl_cert_file=self.SSLCertificate)
-        self.log.info("Cycle to broker %s:%i" % (server[0], server[1]))
+        sh.Logger.info("Cycle to broker %s:%i" % (server[0], server[1]))
         self._listconns.append(self.conn)
         self.msgServers.rotate(-1)
 
@@ -144,10 +137,10 @@ class MessageReader:
             self.conn.connect()
             for dest in self.destinations:
                 self.conn.subscribe(destination=dest, ack='auto')
-            self.log.info('Subscribed to %s' % repr(self.destinations))
+            sh.Logger.info('Subscribed to %s' % repr(self.destinations))
             self.listener.connectedCounter = 100
         except:
-            self.log.error('Connection to broker %s:%i failed after %i retries' % (server[0], server[1],
+            sh.Logger.error('Connection to broker %s:%i failed after %i retries' % (server[0], server[1],
                                                                             self.reconnects))
             self.listener.connectedCounter = 10
 
@@ -155,9 +148,9 @@ class MessageReader:
         while True:
             time.sleep(self._infowrittmsg_everysec)
             if self.listener.connected:
-                self.log.info('Written %i messages in %s hours' %
-                              (self.listener.messagesWriten, self._hours))
-                self.listener.messagesWriten = 0
+                sh.Logger.info('Written %i messages in %s hours' %
+                              (sh.nummsg, self._hours))
+                sh.nummsg = 0
 
     def run(self):
         # loop
@@ -166,6 +159,7 @@ class MessageReader:
 
         t = threading.Thread(target=self._deferwritmsgreport, name='msgwritreport_thread')
         t.daemon = True
+        sh.report_thread = t
         t.start()
 
         while True:
@@ -178,11 +172,11 @@ class MessageReader:
 
             else:
                 if self.listenerIdleTimeout > 0 and loopCount >= self.listenerIdleTimeout:
-                    if not self.listener.messagesWriten > 0:
+                    if not sh.nummsg > 0:
                         self.reconnect = True
                         loopCount = 0
-                        self.listener.messagesWriten = 0
-                        self.log.info('Listener did not receive any message in %s seconds' % self.listenerIdleTimeout)
+                        sh.nummsg = 0
+                        sh.Logger.info('Listener did not receive any message in %s seconds' % self.listenerIdleTimeout)
 
             if self.reconnect or self._reconnconfreload:
                 if self._listconns:
