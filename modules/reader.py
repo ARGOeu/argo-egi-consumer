@@ -112,7 +112,7 @@ class MessageReader:
         self.SSLCertificate = sh.ConsumerConf.get_option('AuthenticationHostKey'.lower())
         self.SSLKey = sh.ConsumerConf.get_option('AuthenticationHostCert'.lower())
         self._hours = sh.ConsumerConf.get_option('GeneralReportWritMsgEveryHours'.lower(), optional=True)
-        self._infowrittmsg_everysec = 60*60*int(self._hours) if self._hours else 60*60*24
+        self._nummsgs_evsec = 3600*float(self._hours) if self._hours else 3600*24
 
     def connect(self):
         # cycle msg server
@@ -145,22 +145,30 @@ class MessageReader:
             self.listener.connectedCounter = 10
 
     def _deferwritmsgreport(self):
+        s = 0
         while True:
-            time.sleep(self._infowrittmsg_everysec)
-            if self.listener.connected:
-                sh.Logger.info('Written %i messages in %s hours' %
-                              (sh.nummsg, self._hours))
-                sh.nummsg = 0
+            if sh.thevent.isSet():
+                dur = time.time() - sh.stime
+                sh.Logger.info('Written %i messages in %.2f hours' %
+                            (sh.nummsg, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+                break
+            if s < self._nummsgs_evsec:
+                sh.thevent.wait(2.0)
+                s += 2
+            else:
+                if self.listener.connected:
+                    sh.Logger.info('Written %i messages in %.2f hours' %
+                                (sh.nummsg, float(self._hours)))
+                    sh.nummsg, s = 0, 0
+                    sh.stime = time.time()
 
     def run(self):
         # loop
         self.listener.connectedCounter = 0
         loopCount = 0
 
-        t = threading.Thread(target=self._deferwritmsgreport, name='msgwritreport_thread')
-        t.daemon = True
-        sh.report_thread = t
-        t.start()
+        self.th = threading.Thread(target=self._deferwritmsgreport, name='msgwritreport_thread')
+        self.th.start()
 
         while True:
             self.reconnect = False

@@ -25,7 +25,6 @@
 # Framework Programme (contract # INFSO-RI-261323)
 
 from argo_egi_consumer.reader import MessageReader
-from argo_egi_consumer.writer import MessageWriter
 from argo_egi_consumer.writer import MsgLogger
 from argo_egi_consumer.shared import SingletonShared as Shared
 from argo_egi_consumer.config import ConsumerConf
@@ -144,6 +143,7 @@ class Daemon:
     def _setup_sighandlers(self):
         def sigtermcleanup(signum, frame):
             sh.Logger.info('Caught SIGTERM')
+            sh.thevent.set()
             try:
                 self.reader.conn.stop()
                 self.reader.conn.disconnect()
@@ -244,9 +244,11 @@ class Daemon:
     def _run(self):
         self.reader = MessageReader()
         sh.Logger.info("Started")
+        sh.seta('stime', time.time())
         self.reader.run()
 
 def main():
+    sh.seta('thevent', threading.Event())
     sh.seta('thlock', threading.Lock())
     sh.seta('Logger', MsgLogger())
     sh.seta('nummsg', 0)
