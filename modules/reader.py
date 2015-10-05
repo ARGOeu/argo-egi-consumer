@@ -116,8 +116,8 @@ class MessageReader:
 
     def connect(self):
         # cycle msg server
-        server = self.msgServers[0]
-        self.conn = stomp.Connection([server],
+        self.server = self.msgServers[0]
+        self.conn = stomp.Connection([self.server],
                             keepalive=('linux',
                                         self.keepaliveidle,
                                         self.keepaliveint,
@@ -126,34 +126,45 @@ class MessageReader:
                             use_ssl=self.useSSL,
                             ssl_key_file=self.SSLKey,
                             ssl_cert_file=self.SSLCertificate)
-        sh.Logger.info("Cycle to broker %s:%i" % (server[0], server[1]))
+        sh.Logger.info("Cycle to broker %s:%i" % (self.server[0], self.server[1]))
         self._listconns.append(self.conn)
         self.msgServers.rotate(-1)
 
         self.conn.set_listener('DestListener', self.listener)
 
         try:
+            self.deststr = ''
             self.conn.start()
             self.conn.connect()
             for dest in self.destinations:
                 self.conn.subscribe(destination=dest, ack='auto')
-            sh.Logger.info('Subscribed to %s' % repr(self.destinations))
+                self.deststr = self.deststr + dest + ', '
+            sh.Logger.info('Subscribed to %s' % (self.deststr[:len(self.deststr) - 2]))
             self.listener.connectedCounter = 100
+            self.tconn = time.time()
         except:
-            sh.Logger.error('Connection to broker %s:%i failed after %i retries' % (server[0], server[1],
+            sh.Logger.error('Connection to broker %s:%i failed after %i retries' % (self.server[0], self.server[1],
                                                                             self.reconnects))
             self.listener.connectedCounter = 10
 
     def _deferwritmsgreport(self):
         s = 0
         while True:
-            if sh.thevent.isSet():
+            if sh.eventusr1.isSet():
+                now = time.time()
+                dur = now - sh.stime
+                sh.Logger.info('Connected to %s:%i for %.2f hours' % (self.server[0], self.server[1], (now - self.tconn)/3600))
+                sh.Logger.info('Subscribed to %s' % (self.deststr[:len(self.deststr) - 2]))
+                sh.Logger.info('Written %i messages in %.2f hours' %
+                            (sh.nummsg, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+                sh.eventusr1.clear()
+            if sh.eventterm.isSet():
                 dur = time.time() - sh.stime
                 sh.Logger.info('Written %i messages in %.2f hours' %
                             (sh.nummsg, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
                 break
             if s < self._nummsgs_evsec:
-                sh.thevent.wait(2.0)
+                sh.eventterm.wait(2.0)
                 s += 2
             else:
                 if self.listener.connected:

@@ -44,7 +44,7 @@ from os import path
 defaultFileLogPastDays = 1
 defaultFileLogFutureDays = 1
 daemonname = 'argo-egi-consumer'
-LOGFORMAT = '%(name)s[%(process)s]: %(message)s'
+LOGFORMAT = '%(name)s[%(process)s]: %(levelname)s %(message)s'
 
 sh = Shared()
 

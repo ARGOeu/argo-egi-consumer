@@ -143,7 +143,7 @@ class Daemon:
     def _setup_sighandlers(self):
         def sigtermcleanup(signum, frame):
             sh.Logger.info('Caught SIGTERM')
-            sh.thevent.set()
+            sh.eventterm.set()
             try:
                 self.reader.conn.stop()
                 self.reader.conn.disconnect()
@@ -164,14 +164,20 @@ class Daemon:
 
         signal.signal(signal.SIGTERM, sigtermcleanup)
 
-        def sighupcleanup(signum, frame):
+        def sigusr1handle(signum, frame):
+            sh.Logger.info('Caught SIGUSR1')
+            sh.eventusr1.set()
+
+        signal.signal(signal.SIGUSR1, sigusr1handle)
+
+        def sighuphandle(signum, frame):
             sh.Logger.info('Caught SIGHUP')
             self.reader.load()
             self.reader.listener.load()
             self.reader.listener.writer.load()
             sh.Logger.info('Config reload')
 
-        signal.signal(signal.SIGHUP, sighupcleanup)
+        signal.signal(signal.SIGHUP, sighuphandle)
 
     def start(self):
         # Check for a pidfile to see if the daemon already runs
@@ -248,7 +254,8 @@ class Daemon:
         self.reader.run()
 
 def main():
-    sh.seta('thevent', threading.Event())
+    sh.seta('eventusr1', threading.Event())
+    sh.seta('eventterm', threading.Event())
     sh.seta('thlock', threading.Lock())
     sh.seta('Logger', MsgLogger())
     sh.seta('nummsg', 0)
