@@ -51,14 +51,12 @@ fi
 
 %changelog
 * Mon Oct 5 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.1-1%{?dist}
-- one msg written report thread, not thread for every reconnect
-- on config reload, only if brokers changed, do reconnect
 - refactoring with introduction of class with shared informations
 - report num of msgs written on received SIGTERM too
 - report some runtime info on SIGUSR1 received
 * Thu Jun 4 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-16%{?dist}
 - on config reload, check if broker servers option changed and only then do reconnect
-- one msg written report thread, not threads per reconnect
+- one msg written report thread, not thread per reconnect
 * Fri May 29 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-15%{?dist}
 - remove double minuses in init script arguments
   https://github.com/ARGOeu/ARGO/issues/138
