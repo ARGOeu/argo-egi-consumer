@@ -36,35 +36,30 @@ import traceback
 import threading
 from collections import deque
 from argo_egi_consumer.writer import MessageWriter
-from argo_egi_consumer.log import ProxyMsgLogger
-from argo_egi_consumer.config import ProxyConsumerConf
+from argo_egi_consumer.shared import SingletonShared as Shared
 
-thlock = threading.Lock()
+sh = Shared()
 
 class DestListener(stomp.ConnectionListener):
-    def __init__(self, config):
-        self._log = ProxyMsgLogger()
-        self.conf = ProxyConsumerConf(config)
+    def __init__(self):
         self.connected = False
         self.connectedCounter = 100
-        self.writer = MessageWriter(config, thlock)
-        self.messagesWriten = 0
-        self.load()
+        self.writer = MessageWriter()
 
     def load(self):
         pass
 
     def on_connected(self, headers, body):
-        self._log.info('Listener connected, session %s' % headers['session'])
+        sh.Logger.info('Listener connected, session %s' % headers['session'])
         self.connected = True
         self.connectedCounter = 100
 
     def on_disconnected(self):
-        self._log.warning("Listener disconnected")
+        sh.Logger.warning("Listener disconnected")
         self.connected = False
 
     def on_error(self, headers, message):
-        self._log.error("Received error %s" % message)
+        sh.Logger.error("Received error %s" % message)
 
     def on_message(self, headers, message):
         lines = message.split('\n')
@@ -82,43 +77,47 @@ class DestListener(stomp.ConnectionListener):
                     fields[key] = value.decode('utf-8', 'replace')
 
             self.writer.writeMessage(fields)
-            self.messagesWriten += 1
+            sh.nummsg += 1
 
         except Exception as inst:
-            self._log.error('Error parsing message: HEADERS: %s BODY: %s' % (headers, message))
+            sh.Logger.error('Error parsing message: HEADERS: %s BODY: %s' % (headers, message))
 
 
 class MessageReader:
-    def __init__(self, config):
-        self.log = ProxyMsgLogger()
-        self.conf = ProxyConsumerConf(config)
-        self.listener = DestListener(config)
+    def __init__(self):
+        self.listener = DestListener()
         self._listconns = []
-        self.reconnect = False
         self._ths = []
+        self._wastupleserv = None
+        self._reconnconfreload = False
         self.load()
 
     def load(self):
-        self.conf.parse()
-        self.msgServers = deque(self.conf.get_option('BrokerServer'.lower()))
-        self.listenerIdleTimeout = int(self.conf.get_option('SubscriptionIdleMsgTimeout'.lower()))
-        ldest = self.conf.get_option('SubscriptionDestinations'.lower()).split(',')
+        sh.ConsumerConf.parse()
+        tupleserv = sh.ConsumerConf.get_option('BrokerServer'.lower())
+        if self._wastupleserv and tupleserv != self._wastupleserv:
+            self._reconnconfreload = True
+        else:
+            self._reconnconfreload = False
+        self._wastupleserv = tupleserv
+        self.msgServers = deque(tupleserv)
+        self.listenerIdleTimeout = int(sh.ConsumerConf.get_option('SubscriptionIdleMsgTimeout'.lower()))
+        ldest = sh.ConsumerConf.get_option('SubscriptionDestinations'.lower()).split(',')
         self.destinations = [t.strip() for t in ldest]
-        self.useSSL = eval(self.conf.get_option('STOMPUseSSL'.lower()))
-        self.keepaliveidle = int(self.conf.get_option('STOMPTCPKeepAliveIdle'.lower()))
-        self.keepaliveint = int(self.conf.get_option('STOMPTCPKeepAliveInterval'.lower()))
-        self.keepaliveprobes = int(self.conf.get_option('STOMPTCPKeepAliveProbes'.lower()))
-        self.reconnects = int(self.conf.get_option('STOMPReconnectAttempts'.lower()))
-        self.SSLCertificate = self.conf.get_option('AuthenticationHostKey'.lower())
-        self.SSLKey = self.conf.get_option('AuthenticationHostCert'.lower())
-        self._hours = self.conf.get_option('GeneralReportWritMsgEveryHours'.lower(), optional=True)
-        self._infowrittmsg_everysec = 60*60*int(self._hours) if self._hours else 60*60*24
-
+        self.useSSL = eval(sh.ConsumerConf.get_option('STOMPUseSSL'.lower()))
+        self.keepaliveidle = int(sh.ConsumerConf.get_option('STOMPTCPKeepAliveIdle'.lower()))
+        self.keepaliveint = int(sh.ConsumerConf.get_option('STOMPTCPKeepAliveInterval'.lower()))
+        self.keepaliveprobes = int(sh.ConsumerConf.get_option('STOMPTCPKeepAliveProbes'.lower()))
+        self.reconnects = int(sh.ConsumerConf.get_option('STOMPReconnectAttempts'.lower()))
+        self.SSLCertificate = sh.ConsumerConf.get_option('AuthenticationHostKey'.lower())
+        self.SSLKey = sh.ConsumerConf.get_option('AuthenticationHostCert'.lower())
+        self._hours = sh.ConsumerConf.get_option('GeneralReportWritMsgEveryHours'.lower(), optional=True)
+        self._nummsgs_evsec = 3600*float(self._hours) if self._hours else 3600*24
 
     def connect(self):
         # cycle msg server
-        server = self.msgServers[0]
-        self.conn = stomp.Connection([server],
+        self.server = self.msgServers[0]
+        self.conn = stomp.Connection([self.server],
                             keepalive=('linux',
                                         self.keepaliveidle,
                                         self.keepaliveint,
@@ -127,38 +126,60 @@ class MessageReader:
                             use_ssl=self.useSSL,
                             ssl_key_file=self.SSLKey,
                             ssl_cert_file=self.SSLCertificate)
-        self.log.info("Cycle to broker %s:%i" % (server[0], server[1]))
+        sh.Logger.info("Cycle to broker %s:%i" % (self.server[0], self.server[1]))
         self._listconns.append(self.conn)
         self.msgServers.rotate(-1)
 
         self.conn.set_listener('DestListener', self.listener)
 
         try:
+            self.deststr = ''
             self.conn.start()
             self.conn.connect()
             for dest in self.destinations:
                 self.conn.subscribe(destination=dest, ack='auto')
-            self.log.info('Subscribed to %s' % repr(self.destinations))
+                self.deststr = self.deststr + dest + ', '
+            sh.Logger.info('Subscribed to %s' % (self.deststr[:len(self.deststr) - 2]))
             self.listener.connectedCounter = 100
+            self.tconn = time.time()
         except:
-            self.log.error('Connection to broker %s:%i failed after %i retries' % (server[0], server[1],
+            sh.Logger.error('Connection to broker %s:%i failed after %i retries' % (self.server[0], self.server[1],
                                                                             self.reconnects))
             self.listener.connectedCounter = 10
 
-    def _deferwritmsgreport(self, e):
+    def _deferwritmsgreport(self):
+        s = 0
         while True:
-            time.sleep(self._infowrittmsg_everysec)
-            if self.listener.connected and not e.isSet():
-                self.log.info('Written %i messages in %s hours' %
-                              (self.listener.messagesWriten, self._hours))
-                self.listener.messagesWriten = 0
-            else:
+            if sh.eventusr1.isSet():
+                now = time.time()
+                dur = now - sh.stime
+                sh.Logger.info('Connected to %s:%i for %.2f hours' % (self.server[0], self.server[1], (now - self.tconn)/3600))
+                sh.Logger.info('Subscribed to %s' % (self.deststr[:len(self.deststr) - 2]))
+                sh.Logger.info('Written %i messages in %.2f hours' %
+                            (sh.nummsg, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+                sh.eventusr1.clear()
+            if sh.eventterm.isSet():
+                dur = time.time() - sh.stime
+                sh.Logger.info('Written %i messages in %.2f hours' %
+                            (sh.nummsg, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
                 break
+            if s < self._nummsgs_evsec:
+                sh.eventterm.wait(2.0)
+                s += 2
+            else:
+                if self.listener.connected:
+                    sh.Logger.info('Written %i messages in %.2f hours' %
+                                (sh.nummsg, float(self._hours)))
+                    sh.nummsg, s = 0, 0
+                    sh.stime = time.time()
 
     def run(self):
         # loop
         self.listener.connectedCounter = 0
         loopCount = 0
+
+        self.th = threading.Thread(target=self._deferwritmsgreport, name='msgwritreport_thread')
+        self.th.start()
 
         while True:
             self.reconnect = False
@@ -170,21 +191,13 @@ class MessageReader:
 
             else:
                 if self.listenerIdleTimeout > 0 and loopCount >= self.listenerIdleTimeout:
-                    if not self.listener.messagesWriten > 0:
+                    if not sh.nummsg > 0:
                         self.reconnect = True
                         loopCount = 0
-                        self.listener.messagesWriten = 0
-                        self.log.info('Listener did not receive any message in %s seconds' % self.listenerIdleTimeout)
+                        sh.nummsg = 0
+                        sh.Logger.info('Listener did not receive any message in %s seconds' % self.listenerIdleTimeout)
 
-            if self.reconnect:
-                if self._ths:
-                    self._e.set()
-                self._e = threading.Event()
-                t = threading.Thread(target=self._deferwritmsgreport, args=(self._e,))
-                t.daemon = True
-                t.start()
-                self._ths.append(t)
-
+            if self.reconnect or self._reconnconfreload:
                 if self._listconns:
                     for conn in self._listconns:
                         try:
@@ -192,6 +205,7 @@ class MessageReader:
                             conn.disconnect()
                         except (socket.error, stomp.exception.NotConnectedException):
                             self.listener.connected = False
+                            self._reconnconfreload = False
                     self._listconns = []
                 self.connect()
 
