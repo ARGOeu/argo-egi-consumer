@@ -1,7 +1,7 @@
 Name: argo-egi-consumer
 Summary: A/R Comp Engine message consumer
-Version: 1.4.0
-Release: 15%{?dist}
+Version: 1.4.1
+Release: 1%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot
 Group:     EGI/SA4
@@ -45,11 +45,18 @@ getent passwd arstats > /dev/null || \
 
 %preun
 if [ "$1" = 0 ] ; then
-   /sbin/service argo-egi-consumer --stop
+   /sbin/service argo-egi-consumer stop
    /sbin/chkconfig --del argo-egi-consumer
 fi
 
 %changelog
+* Mon Oct 5 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.1-1%{?dist}
+- refactoring with introduction of class with shared informations
+- report num of msgs written on received SIGTERM too
+- report some runtime info on SIGUSR1 received
+* Thu Jun 4 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-16%{?dist}
+- on config reload, check if broker servers option changed and only then do reconnect
+- one msg written report thread, not thread per reconnect
 * Fri May 29 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.0-15%{?dist}
 - remove double minuses in init script arguments
   https://github.com/ARGOeu/ARGO/issues/138
