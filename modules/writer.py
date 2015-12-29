@@ -43,15 +43,14 @@ from os import path
 
 defaultFileLogPastDays = 1
 defaultFileLogFutureDays = 1
-daemonname = 'argo-egi-consumer'
 LOGFORMAT = '%(name)s[%(process)s]: %(levelname)s %(message)s'
 
 sh = Shared()
 
 class MsgLogger:
-    def __init__(self):
+    def __init__(self, name):
         formatter = logging.Formatter(LOGFORMAT)
-        self.mylog = logging.getLogger(daemonname)
+        self.mylog = logging.getLogger(name)
         self.mylog.setLevel(logging.DEBUG)
         handler = logging.handlers.SysLogHandler('/dev/log')
         handler.setFormatter(formatter)
