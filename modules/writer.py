@@ -129,8 +129,7 @@ class MessageWriter:
 
             tagattrmap = {'ROC': 'roc', 'voName': 'voName', 'voFqan': 'voFqan'}
             for attr in tagattrmap.keys():
-                if attr in fields:
-                    tags[tagattrmap[attr]] = fields[attr]
+                tags[tagattrmap[attr]] = fields.get(attr, None)
             if tags:
                 msg['tags'] = tags
 
