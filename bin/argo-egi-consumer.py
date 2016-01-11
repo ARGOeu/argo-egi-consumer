@@ -88,7 +88,7 @@ class Daemon:
             except OSError, e:
                 sh.Logger.error("fork #2 failed: %d (%s)\n" % (e.errno, e.strerror))
                 sh.Logger.removeHandler(handler)
-                sys.exit(1)
+                raise SystemExit(1)
 
             # redirect standard file descriptors
             sys.stdout.flush()
@@ -109,7 +109,7 @@ class Daemon:
         except (IOError, OSError) as e:
             sh.Logger.error('%s %s' % (str(self.__class__), e))
             sh.Logger.removeHandler(handler)
-            sys.exit(1)
+            raise SystemExit(1)
 
         try:
             uinfo = pwd.getpwnam(user)
@@ -192,7 +192,7 @@ class Daemon:
             if self._is_pid_running(pid):
                 message = "pidfile %s already exist. Daemon already running?\n"
                 sh.Logger.error(message)
-                sys.exit(1)
+                raise SystemExit(1)
             else:
                 self._delpid
 
@@ -254,12 +254,6 @@ class Daemon:
         self.reader.run()
 
 def main():
-    sh.seta('eventusr1', threading.Event())
-    sh.seta('eventterm', threading.Event())
-    sh.seta('thlock', threading.Lock())
-    sh.seta('Logger', MsgLogger())
-    sh.seta('nummsg', 0)
-
     parser = argparse.ArgumentParser()
     parser.add_argument('--start', action='store_true')
     parser.add_argument('--stop', action='store_true')
@@ -269,11 +263,16 @@ def main():
     parser.add_argument('--status', action='store_true')
     args = parser.parse_args()
 
-    global conf
-    conf = args.config
-    sh.seta('ConsumerConf', ConsumerConf(conf[0]))
+    sh.seta('ConsumerConf', ConsumerConf(args.config[0]))
+    sh.ConsumerConf.parse()
+    sh.seta('eventusr1', threading.Event())
+    sh.seta('eventterm', threading.Event())
+    sh.seta('thlock', threading.Lock())
+    clname = sh.ConsumerConf.get_option('GeneralLogName'.lower(), optional=True)
+    sh.seta('Logger', MsgLogger(clname if clname else os.path.basename(sys.argv[0])))
+    sh.seta('nummsg', 0)
     md = hashlib.md5()
-    md.update(conf[0])
+    md.update(args.config[0])
     daemon = Daemon(pidfile % md.hexdigest(), name=daemonname, nofork=args.nofork)
 
     if args.start:
