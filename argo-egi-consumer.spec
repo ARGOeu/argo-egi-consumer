@@ -7,7 +7,8 @@ Buildroot: %{_tmppath}/%{name}-buildroot
 Group:     EGI/SA4
 BuildArch: noarch
 Source0:   %{name}-%{version}.tar.gz
-Requires: stomppy >= 3.1.6
+Requires: stomppy >= 3.1.6, stomppy < 4
+Requires: avro
 Obsoletes: ar-consumer
 
 %description
