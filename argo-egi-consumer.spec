@@ -1,6 +1,6 @@
 Name: argo-egi-consumer
 Summary: A/R Comp Engine message consumer
-Version: 1.4.1
+Version: 1.4.2
 Release: 1%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot
@@ -50,6 +50,10 @@ if [ "$1" = 0 ] ; then
 fi
 
 %changelog
+* Mon Jan 4 2016 Daniel Vrcic <dvrcic@srce.hr> - 1.4.2-1%{?dist}
+- configurable logger name
+  https://github.com/ARGOeu/ARGO/issues/178
+- write also tag keys without values
 * Mon Oct 5 2015 Daniel Vrcic <dvrcic@srce.hr> - 1.4.1-1%{?dist}
 - refactoring with introduction of class with shared informations
 - report num of msgs written on received SIGTERM too
