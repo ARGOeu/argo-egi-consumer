@@ -9,7 +9,8 @@ class ConsumerConf:
     def __init__(self, confile):
         self._options = {}
         self._args = {'Output': ['Directory', 'Filename', 'ErrorFilename', 'WritePlaintext'],
-                      'General': ['LogName', 'AvroSchema', 'Debug', 'LogFaultyTimestamps', 'ReportWritMsgEveryHours'],
+                      'General': ['LogName', 'AvroSchema', 'Debug', 'LogMsgOutAllowedTime', 'ReportWritMsgEveryHours'],
+                      'MsgRetention': ['PastDaysOk', 'FutureDaysOk'],
                       'Subscription': ['Destinations', 'IdleMsgTimeout'],
                       'Authentication': ['HostKey', 'HostCert'],
                       'STOMP': ['TCPKeepAliveIdle', 'TCPKeepAliveInterval',

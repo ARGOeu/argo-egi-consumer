@@ -84,9 +84,9 @@ class MessageWriter:
         self.errorFilenameTemplate =  sh.ConsumerConf.get_option('OutputErrorFilename'.lower())
         self.avroSchema = sh.ConsumerConf.get_option('GeneralAvroSchema'.lower())
         self.txtOutput = eval(sh.ConsumerConf.get_option('OutputWritePlaintext'.lower()))
-        self.fileLogPastDays = defaultFileLogPastDays
-        self.fileLogFutureDays = defaultFileLogFutureDays
-        self.errorLogFaultyTimestamps = eval(sh.ConsumerConf.get_option('GeneralLogFaultyTimestamps'.lower()))
+        self.pastDaysOk = sh.ConsumerConf.get_option('MsgRetentionPastDaysOk'.lower())
+        self.futureDaysOk = sh.ConsumerConf.get_option('MsgRetentionFutureDaysOk'.lower())
+        self.logOutAllowedTime = eval(sh.ConsumerConf.get_option('GeneralLogMsgOutAllowedTime'.lower()))
 
     def writeMessage(self, fields):
         msgOk = False
@@ -97,16 +97,16 @@ class MessageWriter:
             timeDiff = nowTime - msgTime;
             if timeDiff.days == 0:
                 msgOk = True
-            elif timeDiff.days > 0 and timeDiff.days <= self.fileLogPastDays:
+            elif timeDiff.days > 0 and timeDiff.days <= self.pastDaysOk:
                 msgOk = True
-            elif timeDiff.days < 0 and -timeDiff.days <= self.fileLogFutureDays:
+            elif timeDiff.days < 0 and -timeDiff.days <= self.futureDaysOk:
                 msgOk = True
 
         logMsg = False
         if msgOk:
             filename = self.createLogFilename(fields['timestamp'][:10])
             logMsg = True
-        elif self.errorLogFaultyTimestamps:
+        elif self.logOutAllowedTime:
             filename = self.createErrorLogFilename(fields['timestamp'][:10])
             logMsg = True
 
@@ -170,7 +170,6 @@ class MessageWriter:
 
             finally:
                 sh.thlock.release()
-
 
     def createLogFilename(self, timestamp):
         if self.fileDirectory[-1] != '/':
