@@ -88,6 +88,66 @@ class MessageWriter:
         self.futureDaysOk = sh.ConsumerConf.get_option('MsgRetentionFutureDaysOk'.lower())
         self.logOutAllowedTime = eval(sh.ConsumerConf.get_option('GeneralLogMsgOutAllowedTime'.lower()))
 
+    def _write_to_file(self, log, fields):
+        msglist = []
+        msg, tags = {}, {}
+
+        msg = {'service': fields['serviceType'],
+               'timestamp': fields['timestamp'],
+               'hostname': fields['hostName'],
+               'metric': fields['metricName'],
+               'status': fields['metricStatus']}
+        msgattrmap = {'detailsData': 'message',
+                      'summaryData': 'summary',
+                      'nagios_host': 'monitoring_host'}
+        for attr in msgattrmap.keys():
+            if attr in fields:
+                msg[msgattrmap[attr]] = fields[attr]
+
+        tagattrmap = {'ROC': 'roc', 'voName': 'voName', 'voFqan': 'voFqan'}
+        for attr in tagattrmap.keys():
+            tags[tagattrmap[attr]] = fields.get(attr, None)
+        if tags:
+            msg['tags'] = tags
+
+        if ',' in fields['serviceType']:
+            servtype = fields['serviceType'].split(',')
+            msg['service'] = servtype[0].strip()
+            msglist.append(msg)
+            copymsg = msg.copy()
+            copymsg['service'] = servtype[1].strip()
+            msglist.append(copymsg)
+        else:
+            msglist.append(msg)
+
+        sh.thlock.acquire(True)
+        try:
+            schema = avro.schema.parse(open(self.avroSchema).read())
+            if path.exists(log):
+                avroFile = open(log, 'a+')
+                writer = DataFileWriter(avroFile, DatumWriter())
+            else:
+                avroFile = open(log, 'w+')
+                writer = DataFileWriter(avroFile, DatumWriter(), schema)
+
+            for m in msglist:
+                writer.append(m)
+
+            writer.close()
+            avroFile.close()
+
+            if self.txtOutput:
+                plainfile = open(log+'.TXT', 'a+')
+                plainfile.write(json.dumps(m)+'\n')
+                plainfile.close()
+
+        except (IOError, OSError) as e:
+            sh.Logger.error(e)
+            raise SystemExit(1)
+
+        finally:
+            sh.thlock.release()
+
     def writeMessage(self, fields):
         msgOk = False
         nowTime = datetime.datetime.utcnow().date()
@@ -102,74 +162,12 @@ class MessageWriter:
             elif timeDiff.days < 0 and -timeDiff.days <= self.futureDaysOk:
                 msgOk = True
 
-        logMsg = False
         if msgOk:
             filename = self.createLogFilename(fields['timestamp'][:10])
-            logMsg = True
+            self._write_to_file(filename, fields)
         elif self.logOutAllowedTime:
-            filename = self.createErrorLogFilename(fields['timestamp'][:10])
-            logMsg = True
-
-        if logMsg:
-            # lines
-            msglist = []
-            msg, tags = {}, {}
-
-            msg = {'service': fields['serviceType'],
-                   'timestamp': fields['timestamp'],
-                   'hostname': fields['hostName'],
-                   'metric': fields['metricName'],
-                   'status': fields['metricStatus']}
-            msgattrmap = {'detailsData': 'message',
-                          'summaryData': 'summary',
-                          'nagios_host': 'monitoring_host'}
-            for attr in msgattrmap.keys():
-                if attr in fields:
-                    msg[msgattrmap[attr]] = fields[attr]
-
-            tagattrmap = {'ROC': 'roc', 'voName': 'voName', 'voFqan': 'voFqan'}
-            for attr in tagattrmap.keys():
-                tags[tagattrmap[attr]] = fields.get(attr, None)
-            if tags:
-                msg['tags'] = tags
-
-            if ',' in fields['serviceType']:
-                servtype = fields['serviceType'].split(',')
-                msg['service'] = servtype[0].strip()
-                msglist.append(msg)
-                copymsg = msg.copy()
-                copymsg['service'] = servtype[1].strip()
-                msglist.append(copymsg)
-            else:
-                msglist.append(msg)
-
-            sh.thlock.acquire(True)
-            try:
-                schema = avro.schema.parse(open(self.avroSchema).read())
-                if path.exists(filename):
-                    avroFile = open(filename, 'a+')
-                    writer = DataFileWriter(avroFile, DatumWriter())
-                else:
-                    avroFile = open(filename, 'w+')
-                    writer = DataFileWriter(avroFile, DatumWriter(), schema)
-
-                for m in msglist:
-                    writer.append(m)
-
-                writer.close()
-                avroFile.close()
-
-                if self.txtOutput:
-                    plainfile = open(filename+'.TXT', 'a+')
-                    plainfile.write(json.dumps(m)+'\n')
-                    plainfile.close()
-
-            except (IOError, OSError) as e:
-                sh.Logger.error(e)
-                raise SystemExit(1)
-
-            finally:
-                sh.thlock.release()
+            filename = self.createErrorLogFilename(nowTime)
+            self._write_to_file(filename, fields)
 
     def createLogFilename(self, timestamp):
         if self.fileDirectory[-1] != '/':
