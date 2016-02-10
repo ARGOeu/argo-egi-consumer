@@ -148,19 +148,12 @@ class Daemon:
                 self.reader.conn.stop()
                 self.reader.conn.disconnect()
             except stomp.exception.NotConnectedException:
+                sh.Logger.info('Disconnected: %s:%i' % (self.reader.server[0], self.reader.server[1]))
+                if os.path.exists(self.pidfile):
+                    sh.Logger.info('Removing pidfile: %s' % self.pidfile)
+                    os.remove(self.pidfile)
                 sh.Logger.info('Ended')
-                try:
-                    while 1:
-                        raise SystemExit(0)
-                        time.sleep(0.1)
-                except OSError, err:
-                    err = str(err)
-                    if err.find("No such process") > 0:
-                        if os.path.exists(self.pidfile):
-                            os.remove(self.pidfile)
-                    else:
-                        sh.Logger.error(err)
-                        raise SystemExit(1)
+                os._exit(0)
 
         signal.signal(signal.SIGTERM, sigtermcleanup)
 
@@ -180,7 +173,6 @@ class Daemon:
         signal.signal(signal.SIGHUP, sighuphandle)
 
     def start(self):
-        # Check for a pidfile to see if the daemon already runs
         try:
             pf = file(self.pidfile,'r')
             pid = int(pf.read().strip())
@@ -190,7 +182,7 @@ class Daemon:
 
         if pid:
             if self._is_pid_running(pid):
-                message = "pidfile %s already exist. Daemon already running?\n"
+                message = "pidfile %s already exist. Daemon already running?\n" % self.pidfile
                 sh.Logger.error(message)
                 raise SystemExit(1)
             else:
@@ -210,9 +202,9 @@ class Daemon:
             pid = None
 
         if not pid:
-            message = "pidfile %s does not exist. Daemon not running?\n"
+            message = "pidfile %s does not exist. Daemon not running?\n" % self.pidfile
             sh.Logger.error(message)
-            return # not an error in a restart
+            return
         else:
             os.kill(pid, signal.SIGTERM)
 

@@ -130,6 +130,7 @@ class MessageReader:
         sh.Logger.info("Cycle to broker %s:%i" % (self.server[0], self.server[1]))
         self._listconns.append(self.conn)
         self.msgServers.rotate(-1)
+        self.wasserver = self.server
 
         self.conn.set_listener('DestListener', self.listener)
 
@@ -205,6 +206,7 @@ class MessageReader:
                             conn.stop()
                             conn.disconnect()
                         except (socket.error, stomp.exception.NotConnectedException):
+                            sh.Logger.info('Disconnected: %s:%i' % (self.wasserver[0], self.wasserver[1]))
                             self.listener.connected = False
                             self._reconnconfreload = False
                     self._listconns = []
