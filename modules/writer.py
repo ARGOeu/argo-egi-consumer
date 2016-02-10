@@ -56,6 +56,12 @@ class MsgLogger:
         handler = logging.handlers.SysLogHandler('/dev/log')
         handler.setFormatter(formatter)
         self.mylog.addHandler(handler)
+        self.mylog.propagate = False
+
+        self.rootlog = logging.getLogger('')
+        self.rootlog.setLevel(logging.WARNING)
+        self.rootlog.addHandler(handler)
+        self.rootlog.propagate = False
 
     def error(self, msg):
         self.mylog.error(msg)
