@@ -94,6 +94,7 @@ class MessageReader:
 
     def load(self):
         sh.ConsumerConf.parse()
+
         tupleserv = sh.ConsumerConf.get_option('BrokerServer'.lower())
         if self._wastupleserv and tupleserv != self._wastupleserv:
             self._reconnconfreload = True
@@ -101,14 +102,14 @@ class MessageReader:
             self._reconnconfreload = False
         self._wastupleserv = tupleserv
         self.msgServers = deque(tupleserv)
-        self.listenerIdleTimeout = int(sh.ConsumerConf.get_option('SubscriptionIdleMsgTimeout'.lower()))
-        ldest = sh.ConsumerConf.get_option('SubscriptionDestinations'.lower()).split(',')
-        self.destinations = [t.strip() for t in ldest]
-        self.useSSL = eval(sh.ConsumerConf.get_option('STOMPUseSSL'.lower()))
-        self.keepaliveidle = int(sh.ConsumerConf.get_option('STOMPTCPKeepAliveIdle'.lower()))
-        self.keepaliveint = int(sh.ConsumerConf.get_option('STOMPTCPKeepAliveInterval'.lower()))
-        self.keepaliveprobes = int(sh.ConsumerConf.get_option('STOMPTCPKeepAliveProbes'.lower()))
-        self.reconnects = int(sh.ConsumerConf.get_option('STOMPReconnectAttempts'.lower()))
+
+        self.listenerIdleTimeout = sh.ConsumerConf.get_option('SubscriptionIdleMsgTimeout'.lower())
+        self.destinations = sh.ConsumerConf.get_option('SubscriptionDestinations'.lower())
+        self.useSSL = sh.ConsumerConf.get_option('STOMPUseSSL'.lower())
+        self.keepaliveidle = sh.ConsumerConf.get_option('STOMPTCPKeepAliveIdle'.lower())
+        self.keepaliveint = sh.ConsumerConf.get_option('STOMPTCPKeepAliveInterval'.lower())
+        self.keepaliveprobes = sh.ConsumerConf.get_option('STOMPTCPKeepAliveProbes'.lower())
+        self.reconnects = sh.ConsumerConf.get_option('STOMPReconnectAttempts'.lower())
         self.SSLCertificate = sh.ConsumerConf.get_option('AuthenticationHostKey'.lower())
         self.SSLKey = sh.ConsumerConf.get_option('AuthenticationHostCert'.lower())
         self._hours = sh.ConsumerConf.get_option('GeneralReportWritMsgEveryHours'.lower(), optional=True)

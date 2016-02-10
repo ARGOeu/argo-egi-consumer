@@ -81,21 +81,13 @@ class MessageWriter:
         sh.ConsumerConf.parse()
         self.dateFormat = '%Y-%m-%dT%H:%M:%SZ'
         self.fileDirectory = sh.ConsumerConf.get_option('OutputDirectory'.lower())
-
-        self.filenameTemplate =  sh.ConsumerConf.get_option('OutputFilename'.lower())
-        if not re.search(r'DATE(.\w+)$', self.filenameTemplate):
-            sh.Logger.error('No DATE placeholder in OutputFilename')
-            raise SystemExit(1)
-        self.errorFilenameTemplate =  sh.ConsumerConf.get_option('OutputErrorFilename'.lower())
-        if not re.search(r'DATE(.\w+)$', self.errorFilenameTemplate):
-            sh.Logger.error('No DATE placeholder in OutputErrorFilename')
-            raise SystemExit(1)
-
+        self.filenameTemplate = sh.ConsumerConf.get_option('OutputFilename'.lower())
+        self.errorFilenameTemplate = sh.ConsumerConf.get_option('OutputErrorFilename'.lower())
         self.avroSchema = sh.ConsumerConf.get_option('GeneralAvroSchema'.lower())
-        self.txtOutput = eval(sh.ConsumerConf.get_option('OutputWritePlaintext'.lower()))
+        self.txtOutput = sh.ConsumerConf.get_option('OutputWritePlaintext'.lower())
         self.pastDaysOk = sh.ConsumerConf.get_option('MsgRetentionPastDaysOk'.lower())
         self.futureDaysOk = sh.ConsumerConf.get_option('MsgRetentionFutureDaysOk'.lower())
-        self.logOutAllowedTime = eval(sh.ConsumerConf.get_option('GeneralLogMsgOutAllowedTime'.lower()))
+        self.logOutAllowedTime = sh.ConsumerConf.get_option('GeneralLogMsgOutAllowedTime'.lower())
 
     def _write_to_file(self, log, fields):
         msglist = []
@@ -179,9 +171,7 @@ class MessageWriter:
             self._write_to_file(filename, fields)
 
     def createLogFilename(self, timestamp):
-        self.fileDirectory = self.fileDirectory + '/' if self.fileDirectory[-1] != '/' else self.fileDirectory
-        return self.fileDirectory + re.sub(r'DATE(.\w+)$', r'%s\1' % timestamp, self.filenameTemplate)
+        return self.fileDirectory + self.filenameTemplate.replace('DATE', timestamp)
 
     def createErrorLogFilename(self, timestamp):
-        self.fileDirectory = self.fileDirectory + '/' if self.fileDirectory[-1] != '/' else self.fileDirectory
-        return self.fileDirectory + re.sub(r'DATE(.\w+)$', r'%s\1' % timestamp, self.errorFilenameTemplate)
+        return self.fileDirectory + self.errorFilenameTemplate.replace('DATE', timestamp)

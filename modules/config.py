@@ -45,7 +45,7 @@ class ConsumerConf:
         if not self._options:
             self.parse()
         try:
-            if 'brokers' in opt:
+            if opt.startswith('Broker'.lower()):
                 sortbrokers, tupleserv = [], []
                 bn = [serv for serv in self._options.keys() if 'brokers' in serv]
                 if len(bn) > 1:
@@ -69,6 +69,33 @@ class ConsumerConf:
                     tupleserv.append((server, int(port)))
 
                 return tupleserv
+
+            elif opt.startswith('OutputDirectory'.lower()):
+                return self._options[opt] + '/' if self._options[opt][-1] != '/' else self._options[opt]
+
+            elif opt.startswith('OutputFilename'.lower()) or \
+                 opt.startswith('OutputErrorFilename'.lower()):
+                if not re.search(r'DATE(.\w+)$', self._options[opt]):
+                    sh.Logger.error('No DATE placeholder in %s', opt)
+                    raise SystemExit(1)
+                else:
+                    return self._options[opt]
+
+            elif opt.startswith('GeneralLogMsgOutAllowedTime'.lower()) or \
+                 opt.startswith('OutputWritePlaintext'.lower()) or \
+                 opt.startswith('STOMPUseSSL'.lower()):
+                return eval(self._options[opt])
+
+            elif opt.startswith('SubscriptionIdleMsgTimeout'.lower()) or \
+                 opt.startswith('STOMPTCPKeepAliveIdle'.lower()) or \
+                 opt.startswith('STOMPTCPKeepAliveInterval'.lower()) or \
+                 opt.startswith('STOMPTCPKeepAliveProbes'.lower()) or \
+                 opt.startswith('STOMPReconnectAttempts'.lower()) or \
+                 opt.startswith('SubscriptionIdleMsgTimeout'.lower()):
+                return int(self._options[opt])
+
+            elif opt.startswith('SubscriptionDestinations'.lower()):
+                return [t.strip() for t in self._options[opt].split(',')]
 
             else:
                 return self._options[opt]
