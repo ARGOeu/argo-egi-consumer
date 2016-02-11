@@ -173,7 +173,7 @@ class MessageWriter:
             filename = self.createLogFilename(fields['timestamp'][:10])
             self._write_to_file(filename, fields)
         elif self.logOutAllowedTime:
-            filename = self.createErrorLogFilename(nowTime)
+            filename = self.createErrorLogFilename(str(nowTime))
             self._write_to_file(filename, fields)
 
     def createLogFilename(self, timestamp):

@@ -90,6 +90,8 @@ class ConsumerConf:
                  opt.startswith('STOMPTCPKeepAliveIdle'.lower()) or \
                  opt.startswith('STOMPTCPKeepAliveInterval'.lower()) or \
                  opt.startswith('STOMPTCPKeepAliveProbes'.lower()) or \
+                 opt.startswith('MsgRetentionFutureDaysOK'.lower()) or \
+                 opt.startswith('MsgRetentionPastDaysOK'.lower()) or \
                  opt.startswith('STOMPReconnectAttempts'.lower()) or \
                  opt.startswith('SubscriptionIdleMsgTimeout'.lower()):
                 return int(self._options[opt])
