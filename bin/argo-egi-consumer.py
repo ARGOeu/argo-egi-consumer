@@ -157,6 +157,21 @@ class Daemon:
 
         signal.signal(signal.SIGTERM, sigtermcleanup)
 
+        def sigintcleanup(signum, frame):
+            sh.Logger.info('Caught SIGINT')
+            try:
+                self.reader.conn.stop()
+                self.reader.conn.disconnect()
+            except stomp.exception.NotConnectedException:
+                sh.Logger.info('Disconnected: %s:%i' % (self.reader.server[0], self.reader.server[1]))
+                if os.path.exists(self.pidfile):
+                    sh.Logger.info('Removing pidfile: %s' % self.pidfile)
+                    os.remove(self.pidfile)
+                sh.Logger.info('Ended')
+                os._exit(0)
+
+        signal.signal(signal.SIGINT, sigintcleanup)
+
         def sigusr1handle(signum, frame):
             sh.Logger.info('Caught SIGUSR1')
             sh.eventusr1.set()
