@@ -75,8 +75,11 @@ class ConsumerConf:
 
             elif opt.startswith('OutputFilename'.lower()) or \
                  opt.startswith('OutputErrorFilename'.lower()):
+                if '.' not in self._options[opt]:
+                    sh.Logger.error('%s should have an extension' % opt)
+                    raise SystemExit(1)
                 if not re.search(r'DATE(.\w+)$', self._options[opt]):
-                    sh.Logger.error('No DATE placeholder in %s', opt)
+                    sh.Logger.error('No DATE placeholder in %s' % opt)
                     raise SystemExit(1)
                 else:
                     return self._options[opt]

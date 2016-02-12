@@ -144,7 +144,8 @@ class MessageWriter:
             avroFile.close()
 
             if self.txtOutput:
-                plainfile = open(log+'.TXT', 'a+')
+                filename = '.'.join(log.split('.')[:-1]) + '.PLAINTEXT'
+                plainfile = open(filename, 'a+')
                 plainfile.write(json.dumps(m)+'\n')
                 plainfile.close()
 
