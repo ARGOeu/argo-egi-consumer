@@ -94,8 +94,19 @@ class MessageWriter:
         self.pastDaysOk = sh.ConsumerConf.get_option('MsgRetentionPastDaysOk'.lower())
         self.futureDaysOk = sh.ConsumerConf.get_option('MsgRetentionFutureDaysOk'.lower())
         self.logOutAllowedTime = sh.ConsumerConf.get_option('GeneralLogMsgOutAllowedTime'.lower())
+        self.logWrongFormat = sh.ConsumerConf.get_option('GeneralLogWrongFormat'.lower())
 
-    def _write_to_file(self, log, fields):
+    def _write_to_ptxt(self, log, fields, exten):
+        try:
+            filename = '.'.join(log.split('.')[:-1]) + '.%s' % exten
+            plainfile = open(filename, 'a+')
+            plainfile.write(json.dumps(fields) + '\n')
+            plainfile.close()
+        except (IOError, OSError) as e:
+            sh.Logger.error(e)
+            raise SystemExit(1)
+
+    def _write_to_avro(self, log, fields):
         msglist = []
         msg, tags = {}, {}
 
@@ -143,12 +154,6 @@ class MessageWriter:
             writer.close()
             avroFile.close()
 
-            if self.txtOutput:
-                filename = '.'.join(log.split('.')[:-1]) + '.PLAINTEXT'
-                plainfile = open(filename, 'a+')
-                plainfile.write(json.dumps(m)+'\n')
-                plainfile.close()
-
         except (IOError, OSError) as e:
             sh.Logger.error(e)
             raise SystemExit(1)
@@ -156,26 +161,55 @@ class MessageWriter:
         finally:
             sh.thlock.release()
 
-    def writeMessage(self, fields):
-        msgOk = False
-        nowTime = datetime.datetime.utcnow().date()
-        msgTime = nowTime
-        if 'timestamp' in fields:
-            msgTime = datetime.datetime.strptime(fields['timestamp'], self.dateFormat).date()
-            timeDiff = nowTime - msgTime;
-            if timeDiff.days == 0:
-                msgOk = True
-            elif timeDiff.days > 0 and timeDiff.days <= self.pastDaysOk:
-                msgOk = True
-            elif timeDiff.days < 0 and -timeDiff.days <= self.futureDaysOk:
-                msgOk = True
+    def _is_validmsg(self, msgfields):
+        keys = set(msgfields.keys())
+        mandatory_fields = set(['serviceType', 'timestamp', 'hostName', 'metricName', 'metricStatus'])
 
-        if msgOk:
-            filename = self.createLogFilename(fields['timestamp'][:10])
-            self._write_to_file(filename, fields)
-        elif self.logOutAllowedTime:
-            filename = self.createErrorLogFilename(str(nowTime))
-            self._write_to_file(filename, fields)
+        if keys >= mandatory_fields:
+            return True
+        else:
+            sh.Logger.error('Message %s has no mandatory fields: %s' % (msgfields['message-id'],
+                                                                        str([e for e in mandatory_fields.difference(keys)])))
+            return False
+
+    def _is_ininterval(self, msgid, timestamp, now):
+        inint = False
+
+        try:
+            msgTime = datetime.datetime.strptime(timestamp, self.dateFormat).date()
+            nowTime = datetime.datetime.utcnow().date()
+        except ValueError as e:
+            sh.Logger.error('Message %s %s' % (msgid, e))
+            return inint
+
+        timeDiff = nowTime - msgTime
+        if timeDiff.days == 0:
+            inint = True
+        elif timeDiff.days > 0 and timeDiff.days <= self.pastDaysOk:
+            inint = True
+        elif timeDiff.days < 0 and -timeDiff.days <= self.futureDaysOk:
+            inint = True
+
+        return inint
+
+    def writeMessage(self, fields):
+        now = datetime.datetime.utcnow().date()
+
+        if self._is_validmsg(fields):
+            if self._is_ininterval(fields['message-id'], fields['timestamp'], now):
+                filename = self.createLogFilename(fields['timestamp'][:10])
+                self._write_to_avro(filename, fields)
+                if self.txtOutput:
+                    self._write_to_ptxt(filename, fields, 'PLAINTEXT')
+
+            elif self.logOutAllowedTime:
+                filename = self.createErrorLogFilename(str(now))
+                self._write_to_avro(filename, fields)
+                if self.txtOutput:
+                    self._write_to_ptxt(filename, fields, 'PLAINTEXT')
+        elif self.logWrongFormat:
+            filename = self.createErrorLogFilename(str(now))
+            self._write_to_ptxt(filename, fields, 'WRONGFORMAT')
 
     def createLogFilename(self, timestamp):
         return self.fileDirectory + self.filenameTemplate.replace('DATE', timestamp)

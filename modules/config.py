@@ -9,7 +9,7 @@ class ConsumerConf:
     def __init__(self, confile):
         self._options = {}
         self._args = {'Output': ['Directory', 'Filename', 'ErrorFilename', 'WritePlaintext'],
-                      'General': ['LogName', 'AvroSchema', 'Debug', 'LogMsgOutAllowedTime', 'ReportWritMsgEveryHours'],
+                      'General': ['LogName', 'AvroSchema', 'Debug', 'LogMsgOutAllowedTime', 'LogWrongFormat', 'ReportWritMsgEveryHours'],
                       'MsgRetention': ['PastDaysOk', 'FutureDaysOk'],
                       'Subscription': ['Destinations', 'IdleMsgTimeout'],
                       'Authentication': ['HostKey', 'HostCert'],
@@ -85,6 +85,7 @@ class ConsumerConf:
                     return self._options[opt]
 
             elif opt.startswith('GeneralLogMsgOutAllowedTime'.lower()) or \
+                 opt.startswith('GeneralLogWrongFormat'.lower()) or \
                  opt.startswith('OutputWritePlaintext'.lower()) or \
                  opt.startswith('STOMPUseSSL'.lower()):
                 return eval(self._options[opt])

@@ -65,23 +65,18 @@ class DestListener(stomp.ConnectionListener):
         lines = message.split('\n')
         fields = dict()
 
-        try:
-            #header fields
-            fields.update(headers)
-            # body fields
-            for line in lines:
-                splitLine = line.split(': ', 1)
-                if len(splitLine) > 1:
-                    key = splitLine[0]
-                    value = splitLine[1]
-                    fields[key] = value.decode('utf-8', 'replace')
+        #header fields
+        fields.update(headers)
+        # body fields
+        for line in lines:
+            splitLine = line.split(': ', 1)
+            if len(splitLine) > 1:
+                key = splitLine[0]
+                value = splitLine[1]
+                fields[key] = value.decode('utf-8', 'replace')
 
-            self.writer.writeMessage(fields)
-            sh.nummsg += 1
-
-        except Exception as inst:
-            sh.Logger.error('Error parsing message: HEADERS: %s BODY: %s' % (headers, message))
-
+        self.writer.writeMessage(fields)
+        sh.nummsg += 1
 
 class MessageReader:
     def __init__(self):
