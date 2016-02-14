@@ -86,7 +86,7 @@ class ConsumerConf:
 
             elif opt.startswith('GeneralLogMsgOutAllowedTime'.lower()) or \
                  opt.startswith('GeneralLogWrongFormat'.lower()) or \
-                 opt.startswith('GeneraltWritePlaintext'.lower()) or \
+                 opt.startswith('GeneralWritePlaintext'.lower()) or \
                  opt.startswith('STOMPUseSSL'.lower()):
                 return eval(self._options[opt])
 
