@@ -25,7 +25,7 @@
 # Framework Programme (contract # INFSO-RI-261323)
 
 from argo_egi_consumer.reader import MessageReader
-from argo_egi_consumer.writer import MsgLogger
+from argo_egi_consumer.writer import MsgLogger, LOGFORMAT
 from argo_egi_consumer.shared import SingletonShared as Shared
 from argo_egi_consumer.config import ConsumerConf
 
@@ -59,6 +59,8 @@ class Daemon:
 
     def _daemonize(self):
         handler = logging.StreamHandler()
+        formatter = logging.Formatter(LOGFORMAT)
+        handler.setFormatter(formatter)
         sh.Logger.addHandler(handler)
         if not self._nofork:
             try:
