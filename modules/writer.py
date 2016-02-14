@@ -90,7 +90,7 @@ class MessageWriter:
         self.filenameTemplate = sh.ConsumerConf.get_option('OutputFilename'.lower())
         self.errorFilenameTemplate = sh.ConsumerConf.get_option('OutputErrorFilename'.lower())
         self.avroSchema = sh.ConsumerConf.get_option('GeneralAvroSchema'.lower())
-        self.txtOutput = sh.ConsumerConf.get_option('OutputWritePlaintext'.lower())
+        self.txtOutput = sh.ConsumerConf.get_option('GeneralWritePlaintext'.lower())
         self.pastDaysOk = sh.ConsumerConf.get_option('MsgRetentionPastDaysOk'.lower())
         self.futureDaysOk = sh.ConsumerConf.get_option('MsgRetentionFutureDaysOk'.lower())
         self.logOutAllowedTime = sh.ConsumerConf.get_option('GeneralLogMsgOutAllowedTime'.lower())
