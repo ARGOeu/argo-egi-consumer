@@ -204,7 +204,7 @@ class Daemon:
             if self._is_pid_running(pid):
                 message = "pidfile %s already exist. Daemon already running?\n" % self.pidfile
                 sh.Logger.error(message)
-                raise SystemExit(0)
+                raise SystemExit(3)
             else:
                 self._delpid()
 
@@ -246,6 +246,7 @@ class Daemon:
         if pid:
             if self._is_pid_running(pid):
                 sh.Logger.info("%i is running..." % (pid))
+                os.kill(self._getpid(), signal.SIGUSR1)
                 sh.Logger.removeHandler(handler)
                 raise SystemExit(0)
             else:
