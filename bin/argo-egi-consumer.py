@@ -57,6 +57,30 @@ class Daemon:
         self.pidfile = pidfile
         self._nofork = nofork
 
+    def _writepid(self, pid):
+        pf = file(self.pidfile, 'w+')
+        try:
+            pf.write("%s\n" % pid)
+        except (IOError, OSError) as e:
+            sh.Logger.error('%s %s' % (str(self.__class__), e))
+            sh.Logger.removeHandler(handler)
+            raise SystemExit(1)
+        finally:
+            pf.close()
+
+    def _delpid(self):
+        handler = logging.StreamHandler()
+        sh.Logger.addHandler(handler)
+        try:
+            os.seteuid(0)
+            os.setegid(0)
+            sh.Logger.info('Removing pidfile: %s' % self.pidfile)
+            os.remove(self.pidfile)
+        except (IOError, OSError) as e:
+            sh.Logger.error('%s %s' % (str(self.__class__), e))
+            sh.Logger.removeHandler(handler)
+            raise SystemExit(1)
+
     def _daemonize(self):
         handler = logging.StreamHandler()
         formatter = logging.Formatter(LOGFORMAT)
@@ -102,16 +126,11 @@ class Daemon:
             os.dup2(so.fileno(), sys.stdout.fileno())
             os.dup2(se.fileno(), sys.stderr.fileno())
 
-        # write pidfile
+        # register exit handler
         atexit.register(self._delpid)
-        pid = str(os.getpid())
 
-        try:
-            file(self.pidfile,'w+').write("%s\n" % pid)
-        except (IOError, OSError) as e:
-            sh.Logger.error('%s %s' % (str(self.__class__), e))
-            sh.Logger.removeHandler(handler)
-            raise SystemExit(1)
+        # write pid file
+        self._writepid(str(os.getpid()))
 
         try:
             uinfo = pwd.getpwnam(user)
@@ -119,18 +138,6 @@ class Daemon:
             os.setegid(uinfo.pw_gid)
             os.seteuid(uinfo.pw_uid)
         except (OSError, IOError) as e:
-            sh.Logger.error('%s %s' % (str(self.__class__), e))
-            sh.Logger.removeHandler(handler)
-            raise SystemExit(1)
-
-    def _delpid(self):
-        handler = logging.StreamHandler()
-        sh.Logger.addHandler(handler)
-        try:
-            os.seteuid(0)
-            os.setegid(0)
-            os.remove(self.pidfile)
-        except (IOError, OSError) as e:
             sh.Logger.error('%s %s' % (str(self.__class__), e))
             sh.Logger.removeHandler(handler)
             raise SystemExit(1)
@@ -151,11 +158,7 @@ class Daemon:
                 self.reader.conn.disconnect()
             except stomp.exception.NotConnectedException:
                 sh.Logger.info('Disconnected: %s:%i' % (self.reader.server[0], self.reader.server[1]))
-                if os.path.exists(self.pidfile):
-                    sh.Logger.info('Removing pidfile: %s' % self.pidfile)
-                    os.remove(self.pidfile)
-                sh.Logger.info('Ended')
-                os._exit(0)
+                raise SystemExit(3)
 
         signal.signal(signal.SIGTERM, sigtermcleanup)
 
@@ -166,11 +169,7 @@ class Daemon:
                 self.reader.conn.disconnect()
             except stomp.exception.NotConnectedException:
                 sh.Logger.info('Disconnected: %s:%i' % (self.reader.server[0], self.reader.server[1]))
-                if os.path.exists(self.pidfile):
-                    sh.Logger.info('Removing pidfile: %s' % self.pidfile)
-                    os.remove(self.pidfile)
-                sh.Logger.info('Ended')
-                os._exit(0)
+                raise SystemExit(3)
 
         signal.signal(signal.SIGINT, sigintcleanup)
 
@@ -189,72 +188,73 @@ class Daemon:
 
         signal.signal(signal.SIGHUP, sighuphandle)
 
-    def start(self):
-        try:
-            pf = file(self.pidfile,'r')
-            pid = int(pf.read().strip())
-            pf.close()
-        except IOError:
-            pid = None
+    def start(self, isrestart):
+        if not isrestart:
+            sh.Logger.warning("Starting...")
+        pid = None
+        if os.path.exists(self.pidfile):
+            with open(self.pidfile, 'r') as con:
+                pid = int(con.read().strip())
 
         if pid:
             if self._is_pid_running(pid):
                 message = "pidfile %s already exist. Daemon already running?\n" % self.pidfile
                 sh.Logger.error(message)
-                raise SystemExit(1)
+                raise SystemExit(0)
             else:
-                self._delpid
+                self._delpid()
 
         self._setup_sighandlers()
         # Start the daemon
         self._daemonize()
         self._run()
 
-    def stop(self):
-        try:
-            pf = file(self.pidfile,'r')
-            pid = int(pf.read().strip())
-            pf.close()
-        except IOError:
-            pid = None
+    def stop(self, isrestart):
+        if not isrestart:
+            sh.Logger.warning("Stopping...")
+        pid = None
+        if os.path.exists(self.pidfile):
+            with open(self.pidfile, 'r') as con:
+                pid = int(con.read().strip())
 
         if not pid:
             message = "pidfile %s does not exist. Daemon not running?\n" % self.pidfile
             sh.Logger.error(message)
-            return
+            raise SystemExit(3)
         else:
             os.kill(pid, signal.SIGTERM)
 
     def restart(self):
-        self.stop()
-        self.start()
+        sh.Logger.warning("Restarting...")
+        self.stop(True)
+        time.sleep(1)
+        self.start(True)
 
     def status(self):
         # Get the pid from the pidfile
         handler = logging.StreamHandler()
         global log
         sh.Logger.addHandler(handler)
-        try:
-            pf = file(self.pidfile,'r')
-            pid = int(pf.read().strip())
-            pf.close()
-        except IOError:
-            pid = None
+
+        pid = None
+        if os.path.exists(self.pidfile):
+            with open(self.pidfile, 'r') as con:
+                pid = int(con.read().strip())
 
         if pid:
             if self._is_pid_running(pid):
                 sh.Logger.info("%i is running..." % (pid))
                 sh.Logger.removeHandler(handler)
-                return 0
+                raise SystemExit(0)
             else:
                 sh.Logger.info("Stopped")
                 sh.Logger.removeHandler(handler)
-                return 3
+                raise SystemExit(3)
 
         else:
             sh.Logger.info("Stopped")
             sh.Logger.removeHandler(handler)
-            return 3
+            raise SystemExit(3)
 
     def _run(self):
         self.reader = MessageReader()
@@ -285,9 +285,9 @@ def main():
     daemon = Daemon(pidfile % md.hexdigest(), name=daemonname, nofork=args.nofork)
 
     if args.start:
-        daemon.start()
+        daemon.start(False)
     elif args.stop:
-        daemon.stop()
+        daemon.stop(False)
     elif args.restart:
         daemon.restart()
     elif args.status:
