@@ -68,6 +68,13 @@ class Daemon:
         finally:
             pf.close()
 
+    def _getpid(self):
+        pid = None
+        if os.path.exists(self.pidfile):
+            with open(self.pidfile, 'r') as con:
+                pid = int(con.read().strip())
+        return pid
+
     def _delpid(self):
         handler = logging.StreamHandler()
         sh.Logger.addHandler(handler)
@@ -191,11 +198,8 @@ class Daemon:
     def start(self, isrestart):
         if not isrestart:
             sh.Logger.warning("Starting...")
-        pid = None
-        if os.path.exists(self.pidfile):
-            with open(self.pidfile, 'r') as con:
-                pid = int(con.read().strip())
 
+        pid = self._getpid()
         if pid:
             if self._is_pid_running(pid):
                 message = "pidfile %s already exist. Daemon already running?\n" % self.pidfile
@@ -212,17 +216,19 @@ class Daemon:
     def stop(self, isrestart):
         if not isrestart:
             sh.Logger.warning("Stopping...")
-        pid = None
-        if os.path.exists(self.pidfile):
-            with open(self.pidfile, 'r') as con:
-                pid = int(con.read().strip())
 
+        pid = self._getpid()
         if not pid:
             message = "pidfile %s does not exist. Daemon not running?\n" % self.pidfile
             sh.Logger.error(message)
             raise SystemExit(3)
         else:
             os.kill(pid, signal.SIGTERM)
+
+    def reload(self):
+        pid = self._getpid()
+        if pid:
+            os.kill(self._getpid(), signal.SIGHUP)
 
     def restart(self):
         sh.Logger.warning("Restarting...")
@@ -235,11 +241,7 @@ class Daemon:
         handler = logging.StreamHandler()
         global log
         sh.Logger.addHandler(handler)
-
-        pid = None
-        if os.path.exists(self.pidfile):
-            with open(self.pidfile, 'r') as con:
-                pid = int(con.read().strip())
+        pid = self._getpid()
 
         if pid:
             if self._is_pid_running(pid):
@@ -250,7 +252,6 @@ class Daemon:
                 sh.Logger.info("Stopped")
                 sh.Logger.removeHandler(handler)
                 raise SystemExit(3)
-
         else:
             sh.Logger.info("Stopped")
             sh.Logger.removeHandler(handler)
@@ -266,6 +267,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--start', action='store_true')
     parser.add_argument('--stop', action='store_true')
+    parser.add_argument('--reload', action='store_true')
     parser.add_argument('--restart', action='store_true')
     parser.add_argument('--config', nargs=1, required=True)
     parser.add_argument('--nofork', action='store_true')
@@ -290,6 +292,8 @@ def main():
         daemon.stop(False)
     elif args.restart:
         daemon.restart()
+    elif args.reload:
+        daemon.reload()
     elif args.status:
         daemon.status()
     else:
