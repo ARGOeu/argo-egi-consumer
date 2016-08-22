@@ -1,7 +1,7 @@
 Name: argo-egi-consumer
 Summary: A/R Comp Engine message consumer
 Version: 1.4.3
-Release: 1%{?dist}
+Release: 2%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot
 Group:     EGI/SA4
@@ -51,6 +51,9 @@ if [ "$1" = 0 ] ; then
 fi
 
 %changelog
+* Mon Aug 22 2016 Daniel Vrcic <dvrcic@srce.hr> - 1.4.3-2%{?dist}
+- introduced reload init script option
+- fixed restart and exiting cleanup
 * Sun Feb 14 2016 Daniel Vrcic <dvrcic@srce.hr> - 1.4.3-1%{?dist}
 - updated README
   https://github.com/ARGOeu/ARGO/issues/182
