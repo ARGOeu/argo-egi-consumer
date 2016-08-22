@@ -8,9 +8,9 @@ sh = Shared()
 class ConsumerConf:
     def __init__(self, confile):
         self._options = {}
-        self._args = {'Output': ['Directory', 'Filename', 'ErrorFilename'],
-                      'General': ['LogName', 'WritePlaintext', 'AvroSchema', 'Debug', 'LogMsgOutAllowedTime', 'LogWrongFormat', 'ReportWritMsgEveryHours'],
-                      'MsgRetention': ['PastDaysOk', 'FutureDaysOk'],
+        self._args = {'MsgFile': ['Directory', 'Filename', 'ErrorFilename', 'WritePlaintext'],
+                      'General': ['LogName', 'AvroSchema', 'Debug', 'LogWrongFormat', 'ReportWritMsgEveryHours'],
+                      'MsgRetention': ['PastDaysOk', 'FutureDaysOk', 'LogMsgOutAllowedTime'],
                       'Subscription': ['Destinations', 'IdleMsgTimeout'],
                       'Authentication': ['HostKey', 'HostCert'],
                       'STOMP': ['TCPKeepAliveIdle', 'TCPKeepAliveInterval',
@@ -84,9 +84,11 @@ class ConsumerConf:
                 else:
                     return self._options[opt]
 
-            elif opt.startswith('GeneralLogMsgOutAllowedTime'.lower()) or \
+            elif opt.startswith('MsgRetentionLogMsgOutAllowedTime'.lower()) or \
                  opt.startswith('GeneralLogWrongFormat'.lower()) or \
-                 opt.startswith('GeneralWritePlaintext'.lower()) or \
+                 opt.startswith('GeneralWriteMsgFile'.lower()) or \
+                 opt.startswith('GeneralWriteMsgIngestion'.lower()) or \
+                 opt.startswith('MsgFileWritePlaintext'.lower()) or \
                  opt.startswith('STOMPUseSSL'.lower()):
                 return eval(self._options[opt])
 

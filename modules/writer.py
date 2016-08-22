@@ -85,16 +85,16 @@ class MessageWriter:
 
     def load(self):
         sh.ConsumerConf.parse()
-        self.dateFormat = '%Y-%m-%dT%H:%M:%SZ'
-        self.fileDirectory = sh.ConsumerConf.get_option('OutputDirectory'.lower())
-        self.filenameTemplate = sh.ConsumerConf.get_option('OutputFilename'.lower())
-        self.errorFilenameTemplate = sh.ConsumerConf.get_option('OutputErrorFilename'.lower())
         self.avroSchema = sh.ConsumerConf.get_option('GeneralAvroSchema'.lower())
-        self.txtOutput = sh.ConsumerConf.get_option('GeneralWritePlaintext'.lower())
-        self.pastDaysOk = sh.ConsumerConf.get_option('MsgRetentionPastDaysOk'.lower())
+        self.dateFormat = '%Y-%m-%dT%H:%M:%SZ'
+        self.errorFilenameTemplate = sh.ConsumerConf.get_option('MsgFileErrorFilename'.lower())
+        self.fileDirectory = sh.ConsumerConf.get_option('MsgFileDirectory'.lower())
+        self.filenameTemplate = sh.ConsumerConf.get_option('MsgFileFilename'.lower())
         self.futureDaysOk = sh.ConsumerConf.get_option('MsgRetentionFutureDaysOk'.lower())
-        self.logOutAllowedTime = sh.ConsumerConf.get_option('GeneralLogMsgOutAllowedTime'.lower())
+        self.logOutAllowedTime = sh.ConsumerConf.get_option('MsgRetentionLogMsgOutAllowedTime'.lower())
         self.logWrongFormat = sh.ConsumerConf.get_option('GeneralLogWrongFormat'.lower())
+        self.pastDaysOk = sh.ConsumerConf.get_option('MsgRetentionPastDaysOk'.lower())
+        self.txtOutput = sh.ConsumerConf.get_option('MsgFileWritePlaintext'.lower())
 
     def _write_to_ptxt(self, log, fields, exten):
         try:
