@@ -171,6 +171,7 @@ class Daemon:
 
         def sigintcleanup(signum, frame):
             sh.Logger.info('Caught SIGINT')
+            sh.eventterm.set()
             try:
                 self.reader.conn.stop()
                 self.reader.conn.disconnect()
