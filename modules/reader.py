@@ -75,7 +75,7 @@ class DestListener(stomp.ConnectionListener):
                 value = splitLine[1]
                 fields[key] = value.decode('utf-8', 'replace')
 
-        self.writer.writeMessage(fields)
+        self.writer.write_msg(fields)
         sh.nummsg += 1
 
 class MessageReader:

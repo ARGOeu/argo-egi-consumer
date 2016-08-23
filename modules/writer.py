@@ -76,33 +76,15 @@ class MsgLogger:
     def removeHandler(self, hdlr):
         self.mylog.removeHandler(hdlr)
 
-
-class MessageWriterFile:
-    def __init__(self):
-        self.load()
-
+class MessageBaseWriter(object):
     def load(self):
         sh.ConsumerConf.parse()
         self.avro_schema = sh.ConsumerConf.get_option('GeneralAvroSchema'.lower())
         self.date_format = '%Y-%m-%dT%H:%M:%SZ'
-        self.errorfilename_template = sh.ConsumerConf.get_option('MsgFileErrorFilename'.lower())
-        self.filedir = sh.ConsumerConf.get_option('MsgFileDirectory'.lower())
-        self.filename_template = sh.ConsumerConf.get_option('MsgFileFilename'.lower())
         self.futuredays_ok = sh.ConsumerConf.get_option('MsgRetentionFutureDaysOk'.lower())
         self.log_out_allowedtime_msg = sh.ConsumerConf.get_option('MsgRetentionLogMsgOutAllowedTime'.lower())
         self.log_wrong_formatted_msg = sh.ConsumerConf.get_option('GeneralLogWrongFormat'.lower())
         self.pastdays_ok = sh.ConsumerConf.get_option('MsgRetentionPastDaysOk'.lower())
-        self.write_plaintxt = sh.ConsumerConf.get_option('MsgFileWritePlaintext'.lower())
-
-    def _write_to_ptxt(self, log, fields, exten):
-        try:
-            filename = '.'.join(log.split('.')[:-1]) + '.%s' % exten
-            plainfile = open(filename, 'a+')
-            plainfile.write(json.dumps(fields) + '\n')
-            plainfile.close()
-        except (IOError, OSError) as e:
-            sh.Logger.error(e)
-            raise SystemExit(1)
 
     def construct_msg(self, fields):
         msglist = []
@@ -138,32 +120,6 @@ class MessageWriterFile:
 
         return msglist
 
-    def _write_to_avro(self, log, fields):
-        msglist = self.construct_msg(fields)
-
-        sh.thlock.acquire(True)
-        try:
-            schema = avro.schema.parse(open(self.avro_schema).read())
-            if path.exists(log):
-                avroFile = open(log, 'a+')
-                writer = DataFileWriter(avroFile, DatumWriter())
-            else:
-                avroFile = open(log, 'w+')
-                writer = DataFileWriter(avroFile, DatumWriter(), schema)
-
-            for m in msglist:
-                writer.append(m)
-
-            writer.close()
-            avroFile.close()
-
-        except (IOError, OSError) as e:
-            sh.Logger.error(e)
-            raise SystemExit(1)
-
-        finally:
-            sh.thlock.release()
-
     def is_validmsg(self, msgfields):
         keys = set(msgfields.keys())
         mandatory_fields = set(['serviceType', 'timestamp', 'hostName', 'metricName', 'metricStatus'])
@@ -196,26 +152,76 @@ class MessageWriterFile:
         return inint
 
     def write_msg(self, fields):
+        pass
+
+class MessageWriterFile(MessageBaseWriter):
+    def __init__(self):
+        self.load()
+
+    def load(self):
+        super(MessageWriterFile, self).load()
+        self.write_plaintxt = sh.ConsumerConf.get_option('MsgFileWritePlaintext'.lower())
+        self.errorfilename_template = sh.ConsumerConf.get_option('MsgFileErrorFilename'.lower())
+        self.filedir = sh.ConsumerConf.get_option('MsgFileDirectory'.lower())
+        self.filename_template = sh.ConsumerConf.get_option('MsgFileFilename'.lower())
+
+    def _write_to_ptxt(self, log, fields, exten):
+        try:
+            filename = '.'.join(log.split('.')[:-1]) + '.%s' % exten
+            plainfile = open(filename, 'a+')
+            plainfile.write(json.dumps(fields) + '\n')
+            plainfile.close()
+        except (IOError, OSError) as e:
+            sh.Logger.error(e)
+            raise SystemExit(1)
+
+    def _write_to_avro(self, log, fields):
+        msglist = self.construct_msg(fields)
+
+        sh.thlock.acquire(True)
+        try:
+            schema = avro.schema.parse(open(self.avro_schema).read())
+            if path.exists(log):
+                avroFile = open(log, 'a+')
+                writer = DataFileWriter(avroFile, DatumWriter())
+            else:
+                avroFile = open(log, 'w+')
+                writer = DataFileWriter(avroFile, DatumWriter(), schema)
+
+            for m in msglist:
+                writer.append(m)
+
+            writer.close()
+            avroFile.close()
+
+        except (IOError, OSError) as e:
+            sh.Logger.error(e)
+            raise SystemExit(1)
+
+        finally:
+            sh.thlock.release()
+
+    def _create_log_filename(self, timestamp):
+        return self.filedir + self.filename_template.replace('DATE', timestamp)
+
+    def _create_error_log_filename(self, timestamp):
+        return self.filedir + self.errorfilename_template.replace('DATE', timestamp)
+
+    def write_msg(self, fields):
         now = datetime.datetime.utcnow().date()
 
         if self.is_validmsg(fields):
             if self.is_ininterval(fields['message-id'], fields['timestamp'], now):
-                filename = self.create_log_filename(fields['timestamp'][:10])
+                filename = self._create_log_filename(fields['timestamp'][:10])
                 self._write_to_avro(filename, fields)
                 if self.write_plaintxt:
                     self._write_to_ptxt(filename, fields, 'PLAINTEXT')
 
             elif self.log_out_allowedtime_msg:
-                filename = self.create_error_log_filename(str(now))
+                filename = self._create_error_log_filename(str(now))
                 self._write_to_avro(filename, fields)
                 if self.write_plaintxt:
                     self._write_to_ptxt(filename, fields, 'PLAINTEXT')
         elif self.log_wrong_formatted_msg:
-            filename = self.create_error_log_filename(str(now))
+            filename = self._create_error_log_filename(str(now))
             self._write_to_ptxt(filename, fields, 'WRONGFORMAT')
-
-    def create_log_filename(self, timestamp):
-        return self.filedir + self.filename_template.replace('DATE', timestamp)
-
-    def create_error_log_filename(self, timestamp):
-        return self.filedir + self.errorfilename_template.replace('DATE', timestamp)
