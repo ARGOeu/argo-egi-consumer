@@ -35,7 +35,7 @@ import time
 import traceback
 import threading
 from collections import deque
-from argo_egi_consumer.writer import MessageWriter
+from argo_egi_consumer.writer import MessageWriterFile
 from argo_egi_consumer.shared import SingletonShared as Shared
 
 sh = Shared()
@@ -44,7 +44,7 @@ class DestListener(stomp.ConnectionListener):
     def __init__(self):
         self.connected = False
         self.connectedCounter = 100
-        self.writer = MessageWriter()
+        self.writer = MessageWriterFile()
 
     def load(self):
         pass

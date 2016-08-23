@@ -42,8 +42,6 @@ from avro.io import DatumReader
 from avro.io import DatumWriter
 from os import path
 
-defaultFileLogPastDays = 1
-defaultFileLogFutureDays = 1
 LOGFORMAT = '%(name)s[%(process)s]: %(levelname)s %(message)s'
 
 sh = Shared()
@@ -79,22 +77,22 @@ class MsgLogger:
         self.mylog.removeHandler(hdlr)
 
 
-class MessageWriter:
+class MessageWriterFile:
     def __init__(self):
         self.load()
 
     def load(self):
         sh.ConsumerConf.parse()
-        self.avroSchema = sh.ConsumerConf.get_option('GeneralAvroSchema'.lower())
-        self.dateFormat = '%Y-%m-%dT%H:%M:%SZ'
-        self.errorFilenameTemplate = sh.ConsumerConf.get_option('MsgFileErrorFilename'.lower())
-        self.fileDirectory = sh.ConsumerConf.get_option('MsgFileDirectory'.lower())
-        self.filenameTemplate = sh.ConsumerConf.get_option('MsgFileFilename'.lower())
-        self.futureDaysOk = sh.ConsumerConf.get_option('MsgRetentionFutureDaysOk'.lower())
-        self.logOutAllowedTime = sh.ConsumerConf.get_option('MsgRetentionLogMsgOutAllowedTime'.lower())
-        self.logWrongFormat = sh.ConsumerConf.get_option('GeneralLogWrongFormat'.lower())
-        self.pastDaysOk = sh.ConsumerConf.get_option('MsgRetentionPastDaysOk'.lower())
-        self.txtOutput = sh.ConsumerConf.get_option('MsgFileWritePlaintext'.lower())
+        self.avro_schema = sh.ConsumerConf.get_option('GeneralAvroSchema'.lower())
+        self.date_format = '%Y-%m-%dT%H:%M:%SZ'
+        self.errorfilename_template = sh.ConsumerConf.get_option('MsgFileErrorFilename'.lower())
+        self.filedir = sh.ConsumerConf.get_option('MsgFileDirectory'.lower())
+        self.filename_template = sh.ConsumerConf.get_option('MsgFileFilename'.lower())
+        self.futuredays_ok = sh.ConsumerConf.get_option('MsgRetentionFutureDaysOk'.lower())
+        self.log_out_allowedtime_msg = sh.ConsumerConf.get_option('MsgRetentionLogMsgOutAllowedTime'.lower())
+        self.log_wrong_formatted_msg = sh.ConsumerConf.get_option('GeneralLogWrongFormat'.lower())
+        self.pastdays_ok = sh.ConsumerConf.get_option('MsgRetentionPastDaysOk'.lower())
+        self.write_plaintxt = sh.ConsumerConf.get_option('MsgFileWritePlaintext'.lower())
 
     def _write_to_ptxt(self, log, fields, exten):
         try:
@@ -106,7 +104,7 @@ class MessageWriter:
             sh.Logger.error(e)
             raise SystemExit(1)
 
-    def _write_to_avro(self, log, fields):
+    def construct_msg(self, fields):
         msglist = []
         msg, tags = {}, {}
 
@@ -138,9 +136,14 @@ class MessageWriter:
         else:
             msglist.append(msg)
 
+        return msglist
+
+    def _write_to_avro(self, log, fields):
+        msglist = self.construct_msg(fields)
+
         sh.thlock.acquire(True)
         try:
-            schema = avro.schema.parse(open(self.avroSchema).read())
+            schema = avro.schema.parse(open(self.avro_schema).read())
             if path.exists(log):
                 avroFile = open(log, 'a+')
                 writer = DataFileWriter(avroFile, DatumWriter())
@@ -161,7 +164,7 @@ class MessageWriter:
         finally:
             sh.thlock.release()
 
-    def _is_validmsg(self, msgfields):
+    def is_validmsg(self, msgfields):
         keys = set(msgfields.keys())
         mandatory_fields = set(['serviceType', 'timestamp', 'hostName', 'metricName', 'metricStatus'])
 
@@ -172,11 +175,11 @@ class MessageWriter:
                                                                         str([e for e in mandatory_fields.difference(keys)])))
             return False
 
-    def _is_ininterval(self, msgid, timestamp, now):
+    def is_ininterval(self, msgid, timestamp, now):
         inint = False
 
         try:
-            msgTime = datetime.datetime.strptime(timestamp, self.dateFormat).date()
+            msgTime = datetime.datetime.strptime(timestamp, self.date_format).date()
             nowTime = datetime.datetime.utcnow().date()
         except ValueError as e:
             sh.Logger.error('Message %s %s' % (msgid, e))
@@ -185,34 +188,34 @@ class MessageWriter:
         timeDiff = nowTime - msgTime
         if timeDiff.days == 0:
             inint = True
-        elif timeDiff.days > 0 and timeDiff.days <= self.pastDaysOk:
+        elif timeDiff.days > 0 and timeDiff.days <= self.pastdays_ok:
             inint = True
-        elif timeDiff.days < 0 and -timeDiff.days <= self.futureDaysOk:
+        elif timeDiff.days < 0 and -timeDiff.days <= self.futuredays_ok:
             inint = True
 
         return inint
 
-    def writeMessage(self, fields):
+    def write_msg(self, fields):
         now = datetime.datetime.utcnow().date()
 
-        if self._is_validmsg(fields):
-            if self._is_ininterval(fields['message-id'], fields['timestamp'], now):
-                filename = self.createLogFilename(fields['timestamp'][:10])
+        if self.is_validmsg(fields):
+            if self.is_ininterval(fields['message-id'], fields['timestamp'], now):
+                filename = self.create_log_filename(fields['timestamp'][:10])
                 self._write_to_avro(filename, fields)
-                if self.txtOutput:
+                if self.write_plaintxt:
                     self._write_to_ptxt(filename, fields, 'PLAINTEXT')
 
-            elif self.logOutAllowedTime:
-                filename = self.createErrorLogFilename(str(now))
+            elif self.log_out_allowedtime_msg:
+                filename = self.create_error_log_filename(str(now))
                 self._write_to_avro(filename, fields)
-                if self.txtOutput:
+                if self.write_plaintxt:
                     self._write_to_ptxt(filename, fields, 'PLAINTEXT')
-        elif self.logWrongFormat:
-            filename = self.createErrorLogFilename(str(now))
+        elif self.log_wrong_formatted_msg:
+            filename = self.create_error_log_filename(str(now))
             self._write_to_ptxt(filename, fields, 'WRONGFORMAT')
 
-    def createLogFilename(self, timestamp):
-        return self.fileDirectory + self.filenameTemplate.replace('DATE', timestamp)
+    def create_log_filename(self, timestamp):
+        return self.filedir + self.filename_template.replace('DATE', timestamp)
 
-    def createErrorLogFilename(self, timestamp):
-        return self.fileDirectory + self.errorFilenameTemplate.replace('DATE', timestamp)
+    def create_error_log_filename(self, timestamp):
+        return self.filedir + self.errorfilename_template.replace('DATE', timestamp)
