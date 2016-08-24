@@ -66,6 +66,7 @@ class DestListener(stomp.ConnectionListener):
         lines = message.split('\n')
         fields = dict()
 
+        sh.nummsgrecv += 1
         #header fields
         fields.update(headers)
         # body fields
@@ -77,8 +78,7 @@ class DestListener(stomp.ConnectionListener):
                 fields[key] = value.decode('utf-8', 'replace')
 
         self.writer.write_msg(fields)
-        self.writering.write_msg(fields)
-        sh.nummsg += 1
+        # self.writering.write_msg(fields)
 
 class MessageReader:
     def __init__(self):
@@ -152,24 +152,30 @@ class MessageReader:
             if sh.eventusr1.isSet():
                 now = time.time()
                 dur = now - sh.stime
+                sh.Logger.info(sh.nummsgfile)
                 sh.Logger.info('Connected to %s:%i for %.2f hours' % (self.server[0], self.server[1], (now - self.tconn)/3600))
                 sh.Logger.info('Subscribed to %s' % (self.deststr[:len(self.deststr) - 2]))
+                sh.Logger.info('Received %i messages in %.2f hours' %
+                            (sh.nummsgrecv, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
                 sh.Logger.info('Written %i messages in %.2f hours' %
-                            (sh.nummsg, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+                            (sh.nummsgfile, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
                 sh.eventusr1.clear()
             if sh.eventterm.isSet():
                 dur = time.time() - sh.stime
+                sh.Logger.info('Received %i messages in %.2f hours' %
+                            (sh.nummsgrecv, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
                 sh.Logger.info('Written %i messages in %.2f hours' %
-                            (sh.nummsg, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+                            (sh.nummsgfile, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
                 break
             if s < self._nummsgs_evsec:
                 sh.eventterm.wait(2.0)
                 s += 2
             else:
                 if self.listener.connected:
+                    # TODO: check which writer is active and print its stats
                     sh.Logger.info('Written %i messages in %.2f hours' %
-                                (sh.nummsg, float(self._hours)))
-                    sh.nummsg, s = 0, 0
+                                (sh.nummsgfile, float(self._hours)))
+                    sh.nummsgfile, sh.nummsging, s = 0, 0, 0
                     sh.stime = time.time()
 
     def run(self):
@@ -190,10 +196,10 @@ class MessageReader:
 
             else:
                 if self.listenerIdleTimeout > 0 and loopCount >= self.listenerIdleTimeout:
-                    if not sh.nummsg > 0:
+                    if not sh.nummsgrecv > 0:
                         self.reconnect = True
                         loopCount = 0
-                        sh.nummsg = 0
+                        sh.nummsging = 0
                         sh.Logger.info('Listener did not receive any message in %s seconds' % self.listenerIdleTimeout)
 
             if self.reconnect or self._reconnconfreload:

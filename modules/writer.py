@@ -220,6 +220,7 @@ class MessageWriterIngestion(MessageBaseWriter):
                                                  data=b64jsonmsg,
                                                  verify=False)
                         response.raise_for_status()
+                        sh.nummsging += 1
                     except (requests.exceptions.ConnectionError,
                             requests.exceptions.Timeout,
                             requests.exceptions.HTTPError) as e:
@@ -258,6 +259,7 @@ class MessageWriterFile(MessageBaseWriter):
 
             for m in msglist:
                 writer.append(m)
+            sh.nummsgfile += len(msglist)
 
         except (IOError, OSError) as e:
             sh.Logger.error(e)
