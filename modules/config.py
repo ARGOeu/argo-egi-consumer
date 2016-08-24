@@ -10,6 +10,7 @@ class ConsumerConf:
         self._options = {}
         self._args = {'MsgFile': ['Directory', 'Filename', 'ErrorFilename', 'WritePlaintext'],
                       'General': ['LogName', 'AvroSchema', 'Debug', 'LogWrongFormat', 'ReportWritMsgEveryHours'],
+                      'MsgIngestion': ['Host', 'Token', 'Tenant'],
                       'MsgRetention': ['PastDaysOk', 'FutureDaysOk', 'LogMsgOutAllowedTime'],
                       'Subscription': ['Destinations', 'IdleMsgTimeout'],
                       'Authentication': ['HostKey', 'HostCert'],

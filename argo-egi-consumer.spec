@@ -9,6 +9,7 @@ BuildArch: noarch
 Source0:   %{name}-%{version}.tar.gz
 Requires: stomppy >= 3.1.6, stomppy < 4
 Requires: avro
+Requires: python-requests
 Obsoletes: ar-consumer
 
 %description
