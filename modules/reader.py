@@ -45,7 +45,7 @@ class DestListener(stomp.ConnectionListener):
         self.connected = False
         self.connectedCounter = 100
         self.writer = MessageWriterFile()
-        self.writering = MessageWriterIngestion()
+        # self.writering = MessageWriterIngestion()
 
     def load(self):
         pass
@@ -78,7 +78,7 @@ class DestListener(stomp.ConnectionListener):
                 fields[key] = value.decode('utf-8', 'replace')
 
         self.writer.write_msg(fields)
-        # self.writering.write_msg(fields)
+        self.writering.write_msg(fields)
 
 class MessageReader:
     def __init__(self):

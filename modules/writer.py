@@ -99,6 +99,19 @@ class MessageBaseWriter(object):
         finally:
             avsc.close()
 
+    def _split_in_two(self, msg, fields):
+        msglist = []
+
+        servtype = fields['serviceType'].split(',')
+        msg['service'] = servtype[0].strip()
+        msglist.append(msg)
+
+        copymsg = msg.copy()
+        copymsg['service'] = servtype[1].strip()
+        msglist.append(copymsg)
+
+        return msglist
+
     def construct_msg(self, fields):
         msglist = []
         msg, tags = {}, {}
@@ -122,12 +135,7 @@ class MessageBaseWriter(object):
             msg['tags'] = tags
 
         if ',' in fields['serviceType']:
-            servtype = fields['serviceType'].split(',')
-            msg['service'] = servtype[0].strip()
-            msglist.append(msg)
-            copymsg = msg.copy()
-            copymsg['service'] = servtype[1].strip()
-            msglist.append(copymsg)
+            msglist += self._split_in_two(msg, fields)
         else:
             msglist.append(msg)
 
@@ -194,16 +202,14 @@ class MessageWriterIngestion(MessageBaseWriter):
             sh.Logger.error(e)
             raise SystemExit(1)
 
-
     def construct_msg(self, fields):
         msglist = super(MessageWriterIngestion, self).construct_msg(fields)
         json_msgs = []
 
         for m in msglist:
             ingest_msg = {"messages": [{"attributes": {"type": "metric_data",
-                                                       "partition_date": datetime.datetime.now().strftime(self.partition_date_format)}
-                                       }],
-                          "data": self._b64enc_msg(m)}
+                                                       "partition_date": datetime.datetime.now().strftime(self.partition_date_format)},
+                                        "data": self._b64enc_msg(m)}]}
             json_msgs.append(json.dumps(ingest_msg))
 
         return json_msgs
