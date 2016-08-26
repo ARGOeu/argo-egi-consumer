@@ -227,9 +227,11 @@ class MessageWriterIngestion(MessageBaseWriter):
                                                  verify=False)
                         response.raise_for_status()
                         sh.nummsging += 1
-                    except (requests.exceptions.ConnectionError,
-                            requests.exceptions.Timeout,
-                            requests.exceptions.HTTPError) as e:
+                    except requests.exceptions.RequestException as e:
+                        if isinstance(e, requests.exceptions.HTTPError):
+                            if e.response.status_code >= 400:
+                                # TODO: disable writer
+                                pass
                         sh.Logger.error(repr(e))
 
 class MessageWriterFile(MessageBaseWriter):

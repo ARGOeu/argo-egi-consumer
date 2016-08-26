@@ -283,6 +283,12 @@ def main():
     sh.seta('thlock', threading.Lock())
     clname = sh.ConsumerConf.get_option('GeneralLogName'.lower(), optional=True)
     sh.seta('Logger', MsgLogger(clname if clname else os.path.basename(sys.argv[0])))
+
+    if not sh.ConsumerConf.get_option('GeneralWriteMsgFile'.lower()) and \
+            not sh.ConsumerConf.get_option('GeneralWriteMsgIngestion'.lower()):
+        sys.stderr.write('%s: At least one writer should be enabled\n' % clname)
+        raise SystemExit(1)
+
     sh.seta('nummsgfile', 0)
     sh.seta('nummsging', 0)
     sh.seta('nummsgrecv', 0)
