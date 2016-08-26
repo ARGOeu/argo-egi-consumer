@@ -56,6 +56,8 @@ class Daemon:
         self.stderr = stderr
         self.pidfile = pidfile
         self._nofork = nofork
+        self._hours = sh.ConsumerConf.get_option('GeneralReportWritMsgEveryHours'.lower(), optional=True)
+        self._nummsgs_evsec = 3600*float(self._hours) if self._hours else 3600*24
 
     def _writepid(self, pid):
         pf = file(self.pidfile, 'w+')
@@ -87,6 +89,49 @@ class Daemon:
             sh.Logger.error(self, e)
             sh.Logger.removeHandler(handler)
             raise SystemExit(1)
+
+    def _report(self):
+        s = 0.0
+        while True:
+            if sh.eventusr1.isSet():
+                now = time.time()
+                dur = now - sh.stime
+                sh.Logger.info('StompConn', 'Connected to %s:%i for %.2f hours' % (sh.server[0], sh.server[1], (now - sh.tconn)/3600))
+                sh.Logger.info('StompConn', 'Subscribed to %s' % (sh.deststr[:len(sh.deststr) - 2]))
+                sh.Logger.info('StompConn', 'Received %i messages in %.2f hours' %
+                            (sh.nummsgrecv, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+                if sh.ConsumerConf.get_option('GeneralWriteMsgFile'.lower()):
+                    sh.Logger.info('MessageWriterFile', 'Written %i messages in %.2f hours' %
+                                (sh.nummsgfile, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+                if sh.ConsumerConf.get_option('GeneralWriteMsgIngestion'.lower()):
+                    sh.Logger.info('MessageWriterIngestion', 'Written %i messages in %.2f hours' %
+                                (sh.nummsging, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+                sh.eventusr1.clear()
+            if sh.eventterm.isSet():
+                dur = time.time() - sh.stime
+                sh.Logger.info(self, 'Received %i messages in %.2f hours' %
+                            (sh.nummsgrecv, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+                if sh.ConsumerConf.get_option('GeneralWriteMsgFile'.lower()):
+                    sh.Logger.info('MessageWriterFile', 'Written %i messages in %.2f hours' %
+                                (sh.nummsgfile, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+                if sh.ConsumerConf.get_option('GeneralWriteMsgIngestion'.lower()):
+                    sh.Logger.info('MessageWriterIngestion', 'Written %i messages in %.2f hours' %
+                                (sh.nummsging, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+                break
+            if s < self._nummsgs_evsec:
+                sh.eventterm.wait(0.2)
+                s += 0.2
+            else:
+                if self.listener.connected:
+                    if sh.ConsumerConf.get_option('GeneralWriteMsgFile'.lower()):
+                        sh.Logger.info('MessageWriterFile', 'Written %i messages in %.2f hours' %
+                                    (sh.nummsgfile, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+                    if sh.ConsumerConf.get_option('GeneralWriteMsgIngestion'.lower()):
+                        sh.Logger.info('MessageWriterIngestion', 'Written %i messages in %.2f hours' %
+                                    (sh.nummsging, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+                    sh.nummsgfile, sh.nummsging, s = 0, 0, 0
+                    sh.stime = time.time()
+
 
     def _daemonize(self):
         handler = logging.StreamHandler()
@@ -164,7 +209,7 @@ class Daemon:
                 self.stomp.conn.stop()
                 self.stomp.conn.disconnect()
             except stomp.exception.NotConnectedException:
-                sh.Logger.info(self, 'Disconnected: %s:%i' % (self.stomp.server[0], self.stomp.server[1]))
+                sh.Logger.info(self, 'Disconnected: %s:%i' % (sh.server[0], sh.server[1]))
                 raise SystemExit(3)
 
         signal.signal(signal.SIGTERM, sigtermcleanup)
@@ -176,7 +221,7 @@ class Daemon:
                 self.stomp.conn.stop()
                 self.stomp.conn.disconnect()
             except stomp.exception.NotConnectedException:
-                sh.Logger.info(self, 'Disconnected: %s:%i' % (self.stomp.server[0], self.stomp.server[1]))
+                sh.Logger.info(self, 'Disconnected: %s:%i' % (sh.server[0], sh.server[1]))
                 raise SystemExit(3)
 
         signal.signal(signal.SIGINT, sigintcleanup)
@@ -260,6 +305,8 @@ class Daemon:
             raise SystemExit(3)
 
     def _run(self):
+        self.th = threading.Thread(target=self._report, name='report')
+        self.th.start()
         self.stomp = StompConn()
         sh.Logger.info(self, "Started")
         sh.seta('stime', time.time())
@@ -292,6 +339,9 @@ def main():
     sh.seta('nummsgfile', 0)
     sh.seta('nummsging', 0)
     sh.seta('nummsgrecv', 0)
+    sh.seta('server', [])
+    sh.seta('deststr', '')
+    sh.seta('tconn', 0)
     md = hashlib.md5()
     md.update(args.config[0])
     daemon = Daemon(pidfile % md.hexdigest(), name=daemonname, nofork=args.nofork)

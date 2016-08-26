@@ -33,7 +33,6 @@ import signal
 import sys
 import time
 import traceback
-import threading
 from collections import deque
 from argo_egi_consumer.writer import MessageWriterFile, MessageWriterIngestion
 from argo_egi_consumer.shared import SingletonShared as Shared
@@ -113,13 +112,11 @@ class StompConn:
         self.reconnects = sh.ConsumerConf.get_option('STOMPReconnectAttempts'.lower())
         self.SSLCertificate = sh.ConsumerConf.get_option('AuthenticationHostKey'.lower())
         self.SSLKey = sh.ConsumerConf.get_option('AuthenticationHostCert'.lower())
-        self._hours = sh.ConsumerConf.get_option('GeneralReportWritMsgEveryHours'.lower(), optional=True)
-        self._nummsgs_evsec = 3600*float(self._hours) if self._hours else 3600*24
 
     def connect(self):
         # cycle msg server
-        self.server = self.msgServers[0]
-        self.conn = stomp.Connection([self.server],
+        sh.server = self.msgServers[0]
+        self.conn = stomp.Connection([sh.server],
                             keepalive=('linux',
                                         self.keepaliveidle,
                                         self.keepaliveint,
@@ -128,77 +125,33 @@ class StompConn:
                             use_ssl=self.useSSL,
                             ssl_key_file=self.SSLKey,
                             ssl_cert_file=self.SSLCertificate)
-        sh.Logger.info(self, "Cycle to broker %s:%i" % (self.server[0], self.server[1]))
+        sh.Logger.info(self, "Cycle to broker %s:%i" % (sh.server[0], sh.server[1]))
         self._listconns.append(self.conn)
         self.msgServers.rotate(-1)
-        self.wasserver = self.server
+        self.wasserver = sh.server
 
         self.conn.set_listener('DestListener', self.listener)
 
         try:
-            self.deststr = ''
+            sh.deststr = ''
             self.conn.start()
             self.conn.connect()
             for dest in self.destinations:
                 self.conn.subscribe(destination=dest, ack='auto')
-                self.deststr = self.deststr + dest + ', '
-            sh.Logger.info(self, 'Subscribed to %s' % (self.deststr[:len(self.deststr) - 2]))
+                sh.deststr = sh.deststr + dest + ', '
+            sh.Logger.info(self, 'Subscribed to %s' % (sh.deststr[:len(sh.deststr) - 2]))
             self.listener.connectedCounter = 100
-            self.tconn = time.time()
+            sh.tconn = time.time()
         except:
-            sh.Logger.error(self, 'Connection to broker %s:%i failed after %i retries' % (self.server[0], self.server[1],
+            sh.Logger.error(self, 'Connection to broker %s:%i failed after %i retries' % (sh.server[0], sh.server[1],
                                                                             self.reconnects))
             self.listener.connectedCounter = 10
 
-    def _deferwritmsgreport(self):
-        s = 0
-        while True:
-            if sh.eventusr1.isSet():
-                now = time.time()
-                dur = now - sh.stime
-                sh.Logger.info(self, 'Connected to %s:%i for %.2f hours' % (self.server[0], self.server[1], (now - self.tconn)/3600))
-                sh.Logger.info(self, 'Subscribed to %s' % (self.deststr[:len(self.deststr) - 2]))
-                sh.Logger.info(self, 'Received %i messages in %.2f hours' %
-                            (sh.nummsgrecv, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
-                if sh.ConsumerConf.get_option('GeneralWriteMsgFile'.lower()):
-                    sh.Logger.info('MessageWriterFile', 'Written %i messages in %.2f hours' %
-                                (sh.nummsgfile, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
-                if sh.ConsumerConf.get_option('GeneralWriteMsgIngestion'.lower()):
-                    sh.Logger.info('MessageWriterIngestion', 'Written %i messages in %.2f hours' %
-                                (sh.nummsging, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
-                sh.eventusr1.clear()
-            if sh.eventterm.isSet():
-                dur = time.time() - sh.stime
-                sh.Logger.info(self, 'Received %i messages in %.2f hours' %
-                            (sh.nummsgrecv, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
-                if sh.ConsumerConf.get_option('GeneralWriteMsgFile'.lower()):
-                    sh.Logger.info('MessageWriterFile', 'Written %i messages in %.2f hours' %
-                                (sh.nummsgfile, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
-                if sh.ConsumerConf.get_option('GeneralWriteMsgIngestion'.lower()):
-                    sh.Logger.info('MessageWriterIngestion', 'Written %i messages in %.2f hours' %
-                                (sh.nummsging, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
-                break
-            if s < self._nummsgs_evsec:
-                sh.eventterm.wait(2.0)
-                s += 2
-            else:
-                if self.listener.connected:
-                    if sh.ConsumerConf.get_option('GeneralWriteMsgFile'.lower()):
-                        sh.Logger.info('MessageWriterFile', 'Written %i messages in %.2f hours' %
-                                    (sh.nummsgfile, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
-                    if sh.ConsumerConf.get_option('GeneralWriteMsgIngestion'.lower()):
-                        sh.Logger.info('MessageWriterIngestion', 'Written %i messages in %.2f hours' %
-                                    (sh.nummsging, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
-                    sh.nummsgfile, sh.nummsging, s = 0, 0, 0
-                    sh.stime = time.time()
 
     def run(self):
         # loop
         self.listener.connectedCounter = 0
         loopCount = 0
-
-        self.th = threading.Thread(target=self._deferwritmsgreport, name='msgwritreport_thread')
-        self.th.start()
 
         while True:
             self.reconnect = False
