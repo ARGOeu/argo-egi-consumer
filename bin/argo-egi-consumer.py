@@ -24,7 +24,7 @@
 # the EGI-InSPIRE project through the European Commission's 7th
 # Framework Programme (contract # INFSO-RI-261323)
 
-from argo_egi_consumer.reader import MessageReader
+from argo_egi_consumer.reader import StompConn
 from argo_egi_consumer.writer import MsgLogger, LOGFORMAT
 from argo_egi_consumer.shared import SingletonShared as Shared
 from argo_egi_consumer.config import ConsumerConf
@@ -62,7 +62,7 @@ class Daemon:
         try:
             pf.write("%s\n" % pid)
         except (IOError, OSError) as e:
-            sh.Logger.error('%s %s' % (str(self.__class__), e))
+            sh.Logger.error(self, e)
             sh.Logger.removeHandler(handler)
             raise SystemExit(1)
         finally:
@@ -81,10 +81,10 @@ class Daemon:
         try:
             os.seteuid(0)
             os.setegid(0)
-            sh.Logger.info('Removing pidfile: %s' % self.pidfile)
+            sh.Logger.info(self, 'Removing pidfile: %s' % self.pidfile)
             os.remove(self.pidfile)
         except (IOError, OSError) as e:
-            sh.Logger.error('%s %s' % (str(self.__class__), e))
+            sh.Logger.error(self, e)
             sh.Logger.removeHandler(handler)
             raise SystemExit(1)
 
@@ -99,7 +99,7 @@ class Daemon:
                 if pid > 0:
                     raise SystemExit(0)
             except OSError, e:
-                sh.Logger.error("fork #1 failed: %d (%s)\n" % (e.errno, e.strerror))
+                sh.Logger.error(self, "fork #1 failed: %d (%s)" % (e.errno, e.strerror))
                 sh.Logger.removeHandler(handler)
                 raise SystemExit(1)
 
@@ -109,7 +109,7 @@ class Daemon:
                 # decouple from parent environment
                 os.setsid()
             except OSError as e:
-                sh.Logger.error('%s %s' % (str(self.__class__), e))
+                sh.Logger.error(self, e)
                 sh.Logger.removeHandler(handler)
                 raise SystemExit(1)
 
@@ -119,7 +119,7 @@ class Daemon:
                 if pid > 0:
                     raise SystemExit(0)
             except OSError, e:
-                sh.Logger.error("fork #2 failed: %d (%s)\n" % (e.errno, e.strerror))
+                sh.Logger.error(self, "fork #2 failed: %d (%s)" % (e.errno, e.strerror))
                 sh.Logger.removeHandler(handler)
                 raise SystemExit(1)
 
@@ -145,7 +145,7 @@ class Daemon:
             os.setegid(uinfo.pw_gid)
             os.seteuid(uinfo.pw_uid)
         except (OSError, IOError) as e:
-            sh.Logger.error('%s %s' % (str(self.__class__), e))
+            sh.Logger.error(self, e)
             sh.Logger.removeHandler(handler)
             raise SystemExit(1)
 
@@ -158,53 +158,53 @@ class Daemon:
 
     def _setup_sighandlers(self):
         def sigtermcleanup(signum, frame):
-            sh.Logger.info('Caught SIGTERM')
+            sh.Logger.info(self, 'Caught SIGTERM')
             sh.eventterm.set()
             try:
-                self.reader.conn.stop()
-                self.reader.conn.disconnect()
+                self.stomp.conn.stop()
+                self.stomp.conn.disconnect()
             except stomp.exception.NotConnectedException:
-                sh.Logger.info('Disconnected: %s:%i' % (self.reader.server[0], self.reader.server[1]))
+                sh.Logger.info(self, 'Disconnected: %s:%i' % (self.stomp.server[0], self.stomp.server[1]))
                 raise SystemExit(3)
 
         signal.signal(signal.SIGTERM, sigtermcleanup)
 
         def sigintcleanup(signum, frame):
-            sh.Logger.info('Caught SIGINT')
+            sh.Logger.info(self, 'Caught SIGINT')
             sh.eventterm.set()
             try:
-                self.reader.conn.stop()
-                self.reader.conn.disconnect()
+                self.stomp.conn.stop()
+                self.stomp.conn.disconnect()
             except stomp.exception.NotConnectedException:
-                sh.Logger.info('Disconnected: %s:%i' % (self.reader.server[0], self.reader.server[1]))
+                sh.Logger.info(self, 'Disconnected: %s:%i' % (self.stomp.server[0], self.stomp.server[1]))
                 raise SystemExit(3)
 
         signal.signal(signal.SIGINT, sigintcleanup)
 
         def sigusr1handle(signum, frame):
-            sh.Logger.info('Caught SIGUSR1')
+            sh.Logger.info(self, 'Caught SIGUSR1')
             sh.eventusr1.set()
 
         signal.signal(signal.SIGUSR1, sigusr1handle)
 
         def sighuphandle(signum, frame):
-            sh.Logger.info('Caught SIGHUP')
-            self.reader.load()
-            self.reader.listener.load()
-            self.reader.listener.writer.load()
-            sh.Logger.info('Config reload')
+            sh.Logger.info(self, 'Caught SIGHUP')
+            self.stomp.load()
+            self.stomp.listener.load()
+            self.stomp.listener.writer.load()
+            sh.Logger.info(self, 'Config reload')
 
         signal.signal(signal.SIGHUP, sighuphandle)
 
     def start(self, isrestart):
         if not isrestart:
-            sh.Logger.warning("Starting...")
+            sh.Logger.warning(self, "Starting...")
 
         pid = self._getpid()
         if pid:
             if self._is_pid_running(pid):
                 message = "pidfile %s already exist. Daemon already running?\n" % self.pidfile
-                sh.Logger.error(message)
+                sh.Logger.error(self, message)
                 raise SystemExit(3)
             else:
                 self._delpid()
@@ -216,12 +216,12 @@ class Daemon:
 
     def stop(self, isrestart):
         if not isrestart:
-            sh.Logger.warning("Stopping...")
+            sh.Logger.warning(self, "Stopping...")
 
         pid = self._getpid()
         if not pid:
             message = "pidfile %s does not exist. Daemon not running?\n" % self.pidfile
-            sh.Logger.error(message)
+            sh.Logger.error(self, message)
             raise SystemExit(3)
         else:
             os.kill(pid, signal.SIGTERM)
@@ -232,7 +232,7 @@ class Daemon:
             os.kill(self._getpid(), signal.SIGHUP)
 
     def restart(self):
-        sh.Logger.warning("Restarting...")
+        sh.Logger.warning(self, "Restarting...")
         self.stop(True)
         time.sleep(1)
         self.start(True)
@@ -246,24 +246,24 @@ class Daemon:
 
         if pid:
             if self._is_pid_running(pid):
-                sh.Logger.info("%i is running..." % (pid))
+                sh.Logger.info(self, "%i is running..." % (pid))
                 os.kill(self._getpid(), signal.SIGUSR1)
                 sh.Logger.removeHandler(handler)
                 raise SystemExit(0)
             else:
-                sh.Logger.info("Stopped")
+                sh.Logger.info(self, "Stopped")
                 sh.Logger.removeHandler(handler)
                 raise SystemExit(3)
         else:
-            sh.Logger.info("Stopped")
+            sh.Logger.info(self, "Stopped")
             sh.Logger.removeHandler(handler)
             raise SystemExit(3)
 
     def _run(self):
-        self.reader = MessageReader()
-        sh.Logger.info("Started")
+        self.stomp = StompConn()
+        sh.Logger.info(self, "Started")
         sh.seta('stime', time.time())
-        self.reader.run()
+        self.stomp.run()
 
 def main():
     parser = argparse.ArgumentParser()

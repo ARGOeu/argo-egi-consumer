@@ -55,16 +55,16 @@ class DestListener(stomp.ConnectionListener):
         pass
 
     def on_connected(self, headers, body):
-        sh.Logger.info('Listener connected, session %s' % headers['session'])
+        sh.Logger.info(self, 'Listener connected, session %s' % headers['session'])
         self.connected = True
         self.connectedCounter = 100
 
     def on_disconnected(self):
-        sh.Logger.warning("Listener disconnected")
+        sh.Logger.warning(self, "Listener disconnected")
         self.connected = False
 
     def on_error(self, headers, message):
-        sh.Logger.error("Received error %s" % message)
+        sh.Logger.error(self, "Received error %s" % message)
 
     def on_message(self, headers, message):
         lines = message.split('\n')
@@ -84,7 +84,7 @@ class DestListener(stomp.ConnectionListener):
         for w in self.writers:
             w.write_msg(fields)
 
-class MessageReader:
+class StompConn:
     def __init__(self):
         self.listener = DestListener()
         self._listconns = []
@@ -128,7 +128,7 @@ class MessageReader:
                             use_ssl=self.useSSL,
                             ssl_key_file=self.SSLKey,
                             ssl_cert_file=self.SSLCertificate)
-        sh.Logger.info("Cycle to broker %s:%i" % (self.server[0], self.server[1]))
+        sh.Logger.info(self, "Cycle to broker %s:%i" % (self.server[0], self.server[1]))
         self._listconns.append(self.conn)
         self.msgServers.rotate(-1)
         self.wasserver = self.server
@@ -142,11 +142,11 @@ class MessageReader:
             for dest in self.destinations:
                 self.conn.subscribe(destination=dest, ack='auto')
                 self.deststr = self.deststr + dest + ', '
-            sh.Logger.info('Subscribed to %s' % (self.deststr[:len(self.deststr) - 2]))
+            sh.Logger.info(self, 'Subscribed to %s' % (self.deststr[:len(self.deststr) - 2]))
             self.listener.connectedCounter = 100
             self.tconn = time.time()
         except:
-            sh.Logger.error('Connection to broker %s:%i failed after %i retries' % (self.server[0], self.server[1],
+            sh.Logger.error(self, 'Connection to broker %s:%i failed after %i retries' % (self.server[0], self.server[1],
                                                                             self.reconnects))
             self.listener.connectedCounter = 10
 
@@ -156,29 +156,39 @@ class MessageReader:
             if sh.eventusr1.isSet():
                 now = time.time()
                 dur = now - sh.stime
-                sh.Logger.info(sh.nummsgfile)
-                sh.Logger.info('Connected to %s:%i for %.2f hours' % (self.server[0], self.server[1], (now - self.tconn)/3600))
-                sh.Logger.info('Subscribed to %s' % (self.deststr[:len(self.deststr) - 2]))
-                sh.Logger.info('Received %i messages in %.2f hours' %
+                sh.Logger.info(self, 'Connected to %s:%i for %.2f hours' % (self.server[0], self.server[1], (now - self.tconn)/3600))
+                sh.Logger.info(self, 'Subscribed to %s' % (self.deststr[:len(self.deststr) - 2]))
+                sh.Logger.info(self, 'Received %i messages in %.2f hours' %
                             (sh.nummsgrecv, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
-                sh.Logger.info('Written %i messages in %.2f hours' %
-                            (sh.nummsgfile, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+                if sh.ConsumerConf.get_option('GeneralWriteMsgFile'.lower()):
+                    sh.Logger.info('MessageWriterFile', 'Written %i messages in %.2f hours' %
+                                (sh.nummsgfile, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+                if sh.ConsumerConf.get_option('GeneralWriteMsgIngestion'.lower()):
+                    sh.Logger.info('MessageWriterIngestion', 'Written %i messages in %.2f hours' %
+                                (sh.nummsging, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
                 sh.eventusr1.clear()
             if sh.eventterm.isSet():
                 dur = time.time() - sh.stime
-                sh.Logger.info('Received %i messages in %.2f hours' %
+                sh.Logger.info(self, 'Received %i messages in %.2f hours' %
                             (sh.nummsgrecv, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
-                sh.Logger.info('Written %i messages in %.2f hours' %
-                            (sh.nummsgfile, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+                if sh.ConsumerConf.get_option('GeneralWriteMsgFile'.lower()):
+                    sh.Logger.info('MessageWriterFile', 'Written %i messages in %.2f hours' %
+                                (sh.nummsgfile, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+                if sh.ConsumerConf.get_option('GeneralWriteMsgIngestion'.lower()):
+                    sh.Logger.info('MessageWriterIngestion', 'Written %i messages in %.2f hours' %
+                                (sh.nummsging, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
                 break
             if s < self._nummsgs_evsec:
                 sh.eventterm.wait(2.0)
                 s += 2
             else:
                 if self.listener.connected:
-                    # TODO: check which writer is active and print its stats
-                    sh.Logger.info('Written %i messages in %.2f hours' %
-                                (sh.nummsgfile, float(self._hours)))
+                    if sh.ConsumerConf.get_option('GeneralWriteMsgFile'.lower()):
+                        sh.Logger.info('MessageWriterFile', 'Written %i messages in %.2f hours' %
+                                    (sh.nummsgfile, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+                    if sh.ConsumerConf.get_option('GeneralWriteMsgIngestion'.lower()):
+                        sh.Logger.info('MessageWriterIngestion', 'Written %i messages in %.2f hours' %
+                                    (sh.nummsging, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
                     sh.nummsgfile, sh.nummsging, s = 0, 0, 0
                     sh.stime = time.time()
 
@@ -204,7 +214,7 @@ class MessageReader:
                         self.reconnect = True
                         loopCount = 0
                         sh.nummsging = 0
-                        sh.Logger.info('Listener did not receive any message in %s seconds' % self.listenerIdleTimeout)
+                        sh.Logger.info(self, 'Listener did not receive any message in %s seconds' % self.listenerIdleTimeout)
 
             if self.reconnect or self._reconnconfreload:
                 if self._listconns:
@@ -213,7 +223,7 @@ class MessageReader:
                             conn.stop()
                             conn.disconnect()
                         except (socket.error, stomp.exception.NotConnectedException):
-                            sh.Logger.info('Disconnected: %s:%i' % (self.wasserver[0], self.wasserver[1]))
+                            sh.Logger.info(self, 'Disconnected: %s:%i' % (self.wasserver[0], self.wasserver[1]))
                             self.listener.connected = False
                             self._reconnconfreload = False
                     self._listconns = []

@@ -65,14 +65,22 @@ class MsgLogger:
         self.rootlog.addHandler(handler)
         self.rootlog.propagate = False
 
-    def error(self, msg):
-        self.mylog.error(msg)
+    def _module_class_name(self, obj):
+        # name = repr(obj.__module__) + '.' + repr(obj.__class__.__name__)
+        if isinstance(obj, str):
+            return obj
+        else:
+            name = repr(obj.__class__.__name__)
+            return name.replace("'",'')
 
-    def info(self, msg):
-        self.mylog.info(msg)
+    def error(self, obj, msg):
+        self.mylog.error(self._module_class_name(obj) + ': ' + str(msg))
 
-    def warning(self, msg):
-        self.mylog.warning(msg)
+    def info(self, obj, msg):
+        self.mylog.info(self._module_class_name(obj) + ': ' + str(msg))
+
+    def warning(self, obj, msg):
+        self.mylog.warning(self._module_class_name(obj) + ': ' + str(msg))
 
     def addHandler(self, hdlr):
         self.mylog.addHandler(hdlr)
@@ -93,7 +101,7 @@ class MessageBaseWriter(object):
             avsc = open(sh.ConsumerConf.get_option('GeneralAvroSchema'.lower()))
             self.schema = avro.schema.parse(avsc.read())
         except (OSError, IOError) as e:
-            sh.Logger.error('%s %s' % (str(self.__class__), e))
+            sh.Logger.error(self, e)
             sh.Logger.removeHandler(handler)
             raise SystemExit(1)
         finally:
@@ -148,8 +156,8 @@ class MessageBaseWriter(object):
         if keys >= mandatory_fields:
             return True
         else:
-            sh.Logger.error('Message %s has no mandatory fields: %s' % (msgfields['message-id'],
-                                                                        str([e for e in mandatory_fields.difference(keys)])))
+            sh.Logger.error(self, 'Message %s has no mandatory fields: %s' % (msgfields['message-id'],
+                                                                                  str([e for e in mandatory_fields.difference(keys)])))
             return False
 
     def is_ininterval(self, msgid, timestamp, now):
@@ -159,7 +167,7 @@ class MessageBaseWriter(object):
             msgTime = datetime.datetime.strptime(timestamp, self.date_format).date()
             nowTime = datetime.datetime.utcnow().date()
         except ValueError as e:
-            sh.Logger.error('Message %s %s' % (msgid, e))
+            sh.Logger.error(self, 'Message %s %s' % (msgid, e))
             return inint
 
         timeDiff = nowTime - msgTime
@@ -199,7 +207,7 @@ class MessageWriterIngestion(MessageBaseWriter):
             return b64encode(raw_bytes)
 
         except (IOError, OSError) as e:
-            sh.Logger.error(e)
+            sh.Logger.error(self, e)
             raise SystemExit(1)
 
     def construct_msg(self, fields):
@@ -232,7 +240,7 @@ class MessageWriterIngestion(MessageBaseWriter):
                             if e.response.status_code >= 400:
                                 # TODO: disable writer
                                 pass
-                        sh.Logger.error(repr(e))
+                        sh.Logger.error(self, e)
 
 class MessageWriterFile(MessageBaseWriter):
     def __init__(self):
@@ -252,7 +260,7 @@ class MessageWriterFile(MessageBaseWriter):
             plainfile.write(json.dumps(msglist) + '\n')
             plainfile.close()
         except (IOError, OSError) as e:
-            sh.Logger.error(e)
+            sh.Logger.error(self, e)
             raise SystemExit(1)
 
     def _write_to_avro(self, log, msglist):
@@ -270,7 +278,7 @@ class MessageWriterFile(MessageBaseWriter):
             sh.nummsgfile += len(msglist)
 
         except (IOError, OSError) as e:
-            sh.Logger.error(e)
+            sh.Logger.error(self, e)
             raise SystemExit(1)
 
         finally:
