@@ -122,7 +122,7 @@ class Daemon:
                 sh.eventterm.wait(0.2)
                 s += 0.2
             else:
-                if self.listener.connected:
+                if self.stomp.listener.connected:
                     if sh.ConsumerConf.get_option('GeneralWriteMsgFile'.lower()):
                         sh.Logger.info('MessageWriterFile', 'Written %i messages in %.2f hours' %
                                     (sh.nummsgfile, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
