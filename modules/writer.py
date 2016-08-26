@@ -240,7 +240,9 @@ class MessageWriterIngestion(MessageBaseWriter):
                             if e.response.status_code >= 400:
                                 # TODO: disable writer
                                 pass
-                        sh.Logger.error(self, e)
+                            sh.Logger.error(self, repr(e) + ' - ' + str(response.json()))
+                        else:
+                            sh.Logger.error(self, repr(e))
 
 class MessageWriterFile(MessageBaseWriter):
     def __init__(self):
