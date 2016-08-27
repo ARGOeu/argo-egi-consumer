@@ -30,6 +30,7 @@ import logging
 import os
 import pprint
 import re
+import httplib
 import requests
 import stomp
 import sys
@@ -195,14 +196,14 @@ class MessageWriterIngestion(MessageBaseWriter):
         self.tenat = sh.ConsumerConf.get_option('MsgIngestionTenant'.lower())
         self.urlapi = "/v1/projects/%s/topics/metric_data:publish?key=%s" % (self.tenat, self.token)
 
-        self.avro_writer = DatumWriter(self.schema)
-        self.bytesio = BytesIO()
-        self.encoder = BinaryEncoder(self.bytesio)
 
     def _b64enc_msg(self, msg):
         try:
-            self.avro_writer.write(msg, self.encoder)
-            raw_bytes = self.bytesio.getvalue()
+            avro_writer = DatumWriter(self.schema)
+            bytesio = BytesIO()
+            encoder = BinaryEncoder(bytesio)
+            avro_writer.write(msg, encoder)
+            raw_bytes = bytesio.getvalue()
 
             return b64encode(raw_bytes)
 
