@@ -104,18 +104,18 @@ class Daemon:
                     sh.Logger.info('MessageWriterFile', 'Written %i messages in %.2f hours' %
                                 (sh.nummsgfile, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
                 if sh.ConsumerConf.get_option('GeneralWriteMsgIngestion'.lower()):
-                    sh.Logger.info('MessageWriterIngestion', 'Written %i messages in %.2f hours' %
+                    sh.Logger.info('MessageWriterIngestion', 'Sent %i messages in %.2f hours' %
                                 (sh.nummsging, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
                 sh.eventusr1.clear()
             if sh.eventterm.isSet():
                 dur = time.time() - sh.stime
-                sh.Logger.info(self, 'Received %i messages in %.2f hours' %
+                sh.Logger.info('StompConn', 'Received %i messages in %.2f hours' %
                             (sh.nummsgrecv, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
                 if sh.ConsumerConf.get_option('GeneralWriteMsgFile'.lower()):
                     sh.Logger.info('MessageWriterFile', 'Written %i messages in %.2f hours' %
                                 (sh.nummsgfile, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
                 if sh.ConsumerConf.get_option('GeneralWriteMsgIngestion'.lower()):
-                    sh.Logger.info('MessageWriterIngestion', 'Written %i messages in %.2f hours' %
+                    sh.Logger.info('MessageWriterIngestion', 'Sent %i messages in %.2f hours' %
                                 (sh.nummsging, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
                 break
             if s < self._nummsgs_evsec:
@@ -123,13 +123,17 @@ class Daemon:
                 s += 0.2
             else:
                 if self.stomp.listener.connected:
+                    sh.Logger.info(self, 'Report every %.2f hour', self._hours)
+                    sh.Logger.info('StompConn', 'Received %i messages in %.2f hours' %
+                                (sh.nummsgrecv, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
                     if sh.ConsumerConf.get_option('GeneralWriteMsgFile'.lower()):
                         sh.Logger.info('MessageWriterFile', 'Written %i messages in %.2f hours' %
                                     (sh.nummsgfile, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
                     if sh.ConsumerConf.get_option('GeneralWriteMsgIngestion'.lower()):
-                        sh.Logger.info('MessageWriterIngestion', 'Written %i messages in %.2f hours' %
+                        sh.Logger.info('MessageWriterIngestion', 'Sent %i messages in %.2f hours' %
                                     (sh.nummsging, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
-                    sh.nummsgfile, sh.nummsging, s = 0, 0, 0
+                    sh.Logger.warning(self, 'Counters reset')
+                    sh.nummsgrecv, sh.nummsgfile, sh.nummsging, s = 0, 0, 0, 0
                     sh.stime = time.time()
 
 
@@ -236,6 +240,7 @@ class Daemon:
             sh.Logger.info(self, 'Caught SIGHUP')
             self.stomp.load()
             self.stomp.listener.load()
+            # TODO: now we have multiple writers
             self.stomp.listener.writer.load()
             sh.Logger.info(self, 'Config reload')
 
