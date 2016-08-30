@@ -123,6 +123,7 @@ class Daemon:
                 s += 0.2
             else:
                 if self.stomp.listener.connected:
+                    dur = time.time() - sh.stime
                     sh.Logger.info(self, 'Report every %.2f hour' % float(self._hours))
                     sh.Logger.info('StompConn', 'Received %i messages in %.2f hours' %
                                 (sh.nummsgrecv, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
@@ -240,8 +241,8 @@ class Daemon:
             sh.Logger.info(self, 'Caught SIGHUP')
             self.stomp.load()
             self.stomp.listener.load()
-            # TODO: now we have multiple writers
-            self.stomp.listener.writer.load()
+            for w in self.stomp.listener.writers:
+                w.load()
             sh.Logger.info(self, 'Config reload')
 
         signal.signal(signal.SIGHUP, sighuphandle)
