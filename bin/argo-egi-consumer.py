@@ -123,7 +123,7 @@ class Daemon:
                 s += 0.2
             else:
                 if self.stomp.listener.connected:
-                    sh.Logger.info(self, 'Report every %.2f hour', self._hours)
+                    sh.Logger.info(self, 'Report every %.2f hour' % float(self._hours))
                     sh.Logger.info('StompConn', 'Received %i messages in %.2f hours' %
                                 (sh.nummsgrecv, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
                     if sh.ConsumerConf.get_option('GeneralWriteMsgFile'.lower()):
