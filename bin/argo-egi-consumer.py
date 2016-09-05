@@ -91,6 +91,16 @@ class Daemon:
             raise SystemExit(1)
 
     def _report(self):
+        def msgs_stat(dur):
+            sh.Logger.info('StompConn', 'Received %i messages in %.2f hours' %
+                        (sh.nummsgrecv, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+            if sh.ConsumerConf.get_option('GeneralWriteMsgFile'.lower()):
+                sh.Logger.info('MessageWriterFile', 'Written %i messages in %.2f hours' %
+                            (sh.nummsgfile, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+            if sh.ConsumerConf.get_option('GeneralWriteMsgIngestion'.lower()):
+                sh.Logger.info('MessageWriterIngestion', 'Sent %i messages in %.2f hours' %
+                            (sh.nummsging, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+
         s = 0.0
         while True:
             if sh.eventusr1.isSet():
@@ -98,42 +108,24 @@ class Daemon:
                 dur = now - sh.stime
                 sh.Logger.info('StompConn', 'Connected to %s:%i for %.2f hours' % (sh.server[0], sh.server[1], (now - sh.tconn)/3600))
                 sh.Logger.info('StompConn', 'Subscribed to %s' % (sh.deststr[:len(sh.deststr) - 2]))
-                sh.Logger.info('StompConn', 'Received %i messages in %.2f hours' %
-                            (sh.nummsgrecv, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
-                if sh.ConsumerConf.get_option('GeneralWriteMsgFile'.lower()):
-                    sh.Logger.info('MessageWriterFile', 'Written %i messages in %.2f hours' %
-                                (sh.nummsgfile, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
-                if sh.ConsumerConf.get_option('GeneralWriteMsgIngestion'.lower()):
-                    sh.Logger.info('MessageWriterIngestion', 'Sent %i messages in %.2f hours' %
-                                (sh.nummsging, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+                msgs_stat(dur)
                 sh.eventusr1.clear()
+
             if sh.eventterm.isSet():
                 dur = time.time() - sh.stime
-                sh.Logger.info('StompConn', 'Received %i messages in %.2f hours' %
-                            (sh.nummsgrecv, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
-                if sh.ConsumerConf.get_option('GeneralWriteMsgFile'.lower()):
-                    sh.Logger.info('MessageWriterFile', 'Written %i messages in %.2f hours' %
-                                (sh.nummsgfile, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
-                if sh.ConsumerConf.get_option('GeneralWriteMsgIngestion'.lower()):
-                    sh.Logger.info('MessageWriterIngestion', 'Sent %i messages in %.2f hours' %
-                                (sh.nummsging, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+                msgs_stat(dur)
                 break
+
             if s < self._nummsgs_evsec:
                 sh.eventterm.wait(0.2)
                 s += 0.2
+
             else:
                 if self.stomp.listener.connected:
                     dur = time.time() - sh.stime
                     sh.Logger.info(self, 'Report every %.2f hour' % float(self._hours))
-                    sh.Logger.info('StompConn', 'Received %i messages in %.2f hours' %
-                                (sh.nummsgrecv, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
-                    if sh.ConsumerConf.get_option('GeneralWriteMsgFile'.lower()):
-                        sh.Logger.info('MessageWriterFile', 'Written %i messages in %.2f hours' %
-                                    (sh.nummsgfile, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
-                    if sh.ConsumerConf.get_option('GeneralWriteMsgIngestion'.lower()):
-                        sh.Logger.info('MessageWriterIngestion', 'Sent %i messages in %.2f hours' %
-                                    (sh.nummsging, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
-                    sh.Logger.warning(self, 'Counters reset')
+                    msgs_stat(dur)
+                    sh.Logger.info(self, 'Counters reset')
                     sh.nummsgrecv, sh.nummsgfile, sh.nummsging, s = 0, 0, 0, 0
                     sh.stime = time.time()
 
