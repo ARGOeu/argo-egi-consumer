@@ -40,15 +40,9 @@ from argo_egi_consumer.shared import SingletonShared as Shared
 sh = Shared()
 
 class DestListener(stomp.ConnectionListener):
-    def __init__(self):
+    def __init__(self, writers):
         self.connected = False
         self.connectedCounter = 100
-        self.writers = []
-
-        if sh.ConsumerConf.get_option('GeneralWriteMsgIngestion'.lower()):
-            self.writers.append(MessageWriterIngestion())
-        if sh.ConsumerConf.get_option('GeneralWriteMsgFile'.lower()):
-            self.writers.append(MessageWriterFile())
 
     def load(self):
         pass
@@ -79,18 +73,22 @@ class DestListener(stomp.ConnectionListener):
                 key = splitLine[0]
                 value = splitLine[1]
                 fields[key] = value.decode('utf-8', 'replace')
+        sh.msgqueue.append(fields)
 
-        for w in self.writers:
-            w.write_msg(fields)
+        if len(sh.msgqueue) == 50:
+            sh.cond.acquire()
+            sh.cond.notify()
+            sh.cond.wait()
+            sh.cond.release()
 
 class StompConn:
     def __init__(self):
-        self.listener = DestListener()
         self._listconns = []
         self._ths = []
         self._wastupleserv = None
         self._reconnconfreload = False
         self.load()
+        self.listener = DestListener(self._ths)
 
     def load(self):
         sh.ConsumerConf.parse()

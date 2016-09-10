@@ -144,11 +144,10 @@ class MessageBaseWriter(object):
             msg['tags'] = tags
 
         if ',' in fields['serviceType']:
-            msglist += self._split_in_two(msg, fields)
+            two_msgs = self._split_in_two(msg, fields)
+            return two_msgs[0], two_msgs[1]
         else:
-            msglist.append(msg)
-
-        return msglist
+            return msg
 
     def is_validmsg(self, msgfields):
         keys = set(msgfields.keys())
@@ -184,8 +183,9 @@ class MessageBaseWriter(object):
     def write_msg(self, fields):
         pass
 
-class MessageWriterIngestion(MessageBaseWriter):
+class MessageWriterIngestion(MessageBaseWriter, threading.Thread):
     def __init__(self):
+        threading.Thread.__init__(self)
         self.load()
 
     def load(self):
@@ -195,7 +195,6 @@ class MessageWriterIngestion(MessageBaseWriter):
         self.token = sh.ConsumerConf.get_option('MsgIngestionToken'.lower())
         self.tenat = sh.ConsumerConf.get_option('MsgIngestionTenant'.lower())
         self.urlapi = "/v1/projects/%s/topics/metric_data:publish?key=%s" % (self.tenat, self.token)
-
 
     def _b64enc_msg(self, msg):
         try:
@@ -245,9 +244,22 @@ class MessageWriterIngestion(MessageBaseWriter):
                         else:
                             sh.Logger.error(self, repr(e))
 
-class MessageWriterFile(MessageBaseWriter):
+class MessageWriterFile(MessageBaseWriter, threading.Thread):
     def __init__(self):
+        threading.Thread.__init__(self)
+        self.name = self.__class__
         self.load()
+
+    def run(self):
+        while True:
+            if sh.eventtermwrit.isSet():
+                break
+            sh.cond.acquire()
+            sh.cond.wait(0.2)
+            if len(sh.msgqueue) == 50:
+                self.write_msg(sh.msgqueue)
+                sh.cond.notify()
+                sh.cond.release()
 
     def load(self):
         super(MessageWriterFile, self).load()
@@ -256,17 +268,21 @@ class MessageWriterFile(MessageBaseWriter):
         self.filedir = sh.ConsumerConf.get_option('MsgFileDirectory'.lower())
         self.filename_template = sh.ConsumerConf.get_option('MsgFileFilename'.lower())
 
-    def _write_to_ptxt(self, log, msglist, exten):
+    def _write_to_ptxt(self, log, msg, exten):
         try:
             filename = '.'.join(log.split('.')[:-1]) + '.%s' % exten
             plainfile = open(filename, 'a+')
-            plainfile.write(json.dumps(msglist) + '\n')
+            if type(msg) == tuple:
+                for m in msg:
+                    plainfile.write(json.dumps(m) + '\n')
+            else:
+                plainfile.write(json.dumps(msg) + '\n')
             plainfile.close()
         except (IOError, OSError) as e:
             sh.Logger.error(self, e)
             raise SystemExit(1)
 
-    def _write_to_avro(self, log, msglist):
+    def _write_to_avro(self, log, msg, count=False):
         sh.thlock.acquire(True)
         try:
             if path.exists(log):
@@ -276,9 +292,15 @@ class MessageWriterFile(MessageBaseWriter):
                 avroFile = open(log, 'w+')
                 writer = DataFileWriter(avroFile, DatumWriter(), self.schema)
 
-            for m in msglist:
-                writer.append(m)
-            sh.nummsgfile += len(msglist)
+            if type(msg) == tuple:
+                for m in msg:
+                    writer.append(m)
+                if count:
+                    sh.nummsgfile += len(msg)
+            else:
+                writer.append(msg)
+                if count:
+                    sh.nummsgfile += 1
 
         except (IOError, OSError) as e:
             sh.Logger.error(self, e)
@@ -295,22 +317,46 @@ class MessageWriterFile(MessageBaseWriter):
     def _create_error_log_filename(self, timestamp):
         return self.filedir + self.errorfilename_template.replace('DATE', timestamp)
 
-    def write_msg(self, fields):
+    def write_msg(self, msgs):
         now = datetime.datetime.utcnow().date()
-        msglist = self.construct_msg(fields)
+        not_valid, not_interval, valid = [], [], []
 
-        if self.is_validmsg(fields):
-            if self.is_ininterval(fields['message-id'], fields['timestamp'], now):
-                filename = self._create_log_filename(fields['timestamp'][:10])
-                self._write_to_avro(filename, msglist)
+        while True:
+            try:
+                msg = msgs.pop()
+                if not self.is_validmsg(msg):
+                    not_valid.append(msg)
+                elif not self.is_ininterval(msg['message-id'], msg['timestamp'], now):
+                    not_interval.append(msg)
+                else:
+                    valid.append(msg)
+            except IndexError:
+                break
+
+        valid = map(self.construct_msg, valid)
+        not_valid = map(self.construct_msg, not_valid)
+        not_interval = map(self.construct_msg, not_interval)
+
+        for m in valid:
+            if type(m) == tuple:
+                filename = self._create_log_filename(m[0]['timestamp'][:10])
+            else:
+                filename = self._create_log_filename(m['timestamp'][:10])
+            self._write_to_avro(filename, m, count=True)
+            if self.write_plaintxt:
+                self._write_to_ptxt(filename, m, 'PLAINTEXT')
+
+        if self.log_out_allowedtime_msg:
+            for m in not_interval:
+                if type(m) == tuple:
+                    filename = self._create_log_filename(m[0]['timestamp'][:10])
+                else:
+                    filename = self._create_log_filename(m['timestamp'][:10])
+                self._write_to_avro(filename, m, count=True)
                 if self.write_plaintxt:
-                    self._write_to_ptxt(filename, msglist, 'PLAINTEXT')
+                    self._write_to_ptxt(filename, m, 'PLAINTEXT')
 
-            elif self.log_out_allowedtime_msg:
+        if self.log_wrong_formatted_msg:
+            for m in not_valid:
                 filename = self._create_error_log_filename(str(now))
-                self._write_to_avro(filename, msglist)
-                if self.write_plaintxt:
-                    self._write_to_ptxt(filename, msglist, 'PLAINTEXT')
-        elif self.log_wrong_formatted_msg:
-            filename = self._create_error_log_filename(str(now))
-            self._write_to_ptxt(filename, msglist, 'WRONGFORMAT')
+                self._write_to_ptxt(filename, m, 'WRONGFORMAT')
