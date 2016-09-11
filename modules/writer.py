@@ -43,9 +43,10 @@ from avro.datafile import DataFileWriter
 from avro.io import BinaryEncoder
 from avro.io import DatumReader
 from avro.io import DatumWriter
+from base64 import b64encode
+from collections import deque
 from io import BytesIO
 from os import path
-from base64 import b64encode
 
 LOGFORMAT = '%(name)s[%(process)s]: %(levelname)s %(message)s'
 
@@ -186,6 +187,10 @@ class MessageBaseWriter(object):
 class MessageWriterIngestion(MessageBaseWriter, threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
+        self.name = self.__class__.__name__
+        sh.eventtermwrit.update({self.name: threading.Event()})
+        sh.cond.update({self.name: threading.Condition()})
+        sh.msgqueues.update({self.name: {'queue': deque(), 'size': 1}})
         self.load()
 
     def load(self):
@@ -247,19 +252,22 @@ class MessageWriterIngestion(MessageBaseWriter, threading.Thread):
 class MessageWriterFile(MessageBaseWriter, threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
-        self.name = self.__class__
+        self.name = self.__class__.__name__
+        sh.eventtermwrit.update({self.name: threading.Event()})
+        sh.cond.update({self.name: threading.Condition()})
+        sh.msgqueues.update({self.name: {'queue': deque(), 'size': 50}})
         self.load()
 
     def run(self):
         while True:
-            if sh.eventtermwrit.isSet():
+            if sh.eventtermwrit[self.name].isSet():
                 break
-            sh.cond.acquire()
-            sh.cond.wait(0.2)
-            if len(sh.msgqueue) == 50:
-                self.write_msg(sh.msgqueue)
-                sh.cond.notify()
-                sh.cond.release()
+            sh.cond[self.name].acquire()
+            sh.cond[self.name].wait(0.2)
+            if len(sh.msgqueues[self.name]['queue']) == sh.msgqueues[self.name]['size']:
+                self.write_msg(sh.msgqueues[self.name]['queue'])
+                sh.cond[self.name].notify()
+                sh.cond[self.name].release()
 
     def load(self):
         super(MessageWriterFile, self).load()
@@ -334,9 +342,6 @@ class MessageWriterFile(MessageBaseWriter, threading.Thread):
                 break
 
         valid = map(self.construct_msg, valid)
-        not_valid = map(self.construct_msg, not_valid)
-        not_interval = map(self.construct_msg, not_interval)
-
         for m in valid:
             if type(m) == tuple:
                 filename = self._create_log_filename(m[0]['timestamp'][:10])
@@ -347,6 +352,7 @@ class MessageWriterFile(MessageBaseWriter, threading.Thread):
                 self._write_to_ptxt(filename, m, 'PLAINTEXT')
 
         if self.log_out_allowedtime_msg:
+            not_interval = map(self.construct_msg, not_interval)
             for m in not_interval:
                 if type(m) == tuple:
                     filename = self._create_log_filename(m[0]['timestamp'][:10])
@@ -357,6 +363,7 @@ class MessageWriterFile(MessageBaseWriter, threading.Thread):
                     self._write_to_ptxt(filename, m, 'PLAINTEXT')
 
         if self.log_wrong_formatted_msg:
+            not_valid = map(self.construct_msg, not_valid)
             for m in not_valid:
                 filename = self._create_error_log_filename(str(now))
                 self._write_to_ptxt(filename, m, 'WRONGFORMAT')

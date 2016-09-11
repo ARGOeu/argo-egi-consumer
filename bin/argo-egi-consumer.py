@@ -109,13 +109,12 @@ class Daemon:
             thi = MessageWriterIngestion()
             thi.daemon = True
             thi.start()
-            thi.name = 'MessageWriterIngestion'
             sh.writers.append(thi)
+
         if sh.ConsumerConf.get_option('GeneralWriteMsgFile'.lower()):
             thf = MessageWriterFile()
             thf.daemon = True
             thf.start()
-            thf.name = 'MessageWriterFile'
             sh.writers.append(thf)
 
     def _writepid(self, pid):
@@ -203,8 +202,8 @@ class Daemon:
         try:
             uinfo = pwd.getpwnam(user)
             os.chown(self.pidfile, uinfo.pw_uid, uinfo.pw_gid)
-            os.setegid(uinfo.pw_gid)
-            os.seteuid(uinfo.pw_uid)
+            # os.setegid(uinfo.pw_gid)
+            # os.seteuid(uinfo.pw_uid)
         except (OSError, IOError) as e:
             sh.Logger.error(self, e)
             sh.Logger.removeHandler(handler)
@@ -222,10 +221,9 @@ class Daemon:
             sh.Logger.info(self, 'Caught SIGTERM')
             sh.eventterm.set()
             for t in sh.writers:
-                if len(sh.msgqueue) > 0:
-                    n = len(sh.msgqueue)
-                    t.write_msg(sh.msgqueue)
-            sh.eventtermwrit.set()
+                if len(sh.msgqueues[t.name]['queue']) > 0:
+                    t.write_msg(sh.msgqueues[t.name]['queue'])
+                sh.eventtermwrit[t.name].set()
 
             try:
                 self.stomp.conn.stop()
@@ -349,10 +347,10 @@ def main():
     sh.ConsumerConf.parse()
     sh.seta('eventusr1', threading.Event())
     sh.seta('eventterm', threading.Event())
-    sh.seta('eventtermwrit', threading.Event())
+    sh.seta('eventtermwrit', {})
     sh.seta('eventwrite', threading.Event())
-    sh.seta('msgqueue', deque())
-    sh.seta('cond', threading.Condition())
+    sh.seta('msgqueues', {})
+    sh.seta('cond', {})
     sh.seta('thlock', threading.Lock())
     clname = sh.ConsumerConf.get_option('GeneralLogName'.lower(), optional=True)
     sh.seta('Logger', MsgLogger(clname if clname else os.path.basename(sys.argv[0])))

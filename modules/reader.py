@@ -73,13 +73,15 @@ class DestListener(stomp.ConnectionListener):
                 key = splitLine[0]
                 value = splitLine[1]
                 fields[key] = value.decode('utf-8', 'replace')
-        sh.msgqueue.append(fields)
 
-        if len(sh.msgqueue) == 50:
-            sh.cond.acquire()
-            sh.cond.notify()
-            sh.cond.wait()
-            sh.cond.release()
+        for q, s in sh.msgqueues.iteritems():
+            sh.msgqueues[q]['queue'].append(fields)
+
+            if len(sh.msgqueues[q]['queue']) == sh.msgqueues[q]['size']:
+                sh.cond[q].acquire()
+                sh.cond[q].notify()
+                sh.cond[q].wait()
+                sh.cond[q].release()
 
 class StompConn:
     def __init__(self):
