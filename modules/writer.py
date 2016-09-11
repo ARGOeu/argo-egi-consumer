@@ -190,8 +190,19 @@ class MessageWriterIngestion(MessageBaseWriter, threading.Thread):
         self.name = self.__class__.__name__
         sh.eventtermwrit.update({self.name: threading.Event()})
         sh.cond.update({self.name: threading.Condition()})
-        sh.msgqueues.update({self.name: {'queue': deque(), 'size': 1}})
+        sh.msgqueues.update({self.name: {'queue': deque(), 'size': 50}})
         self.load()
+
+    def run(self):
+        while True:
+            if sh.eventtermwrit[self.name].isSet():
+                break
+            sh.cond[self.name].acquire()
+            sh.cond[self.name].wait(0.2)
+            if len(sh.msgqueues[self.name]['queue']) == sh.msgqueues[self.name]['size']:
+                self.write_msg(sh.msgqueues[self.name]['queue'])
+                sh.cond[self.name].notify()
+                sh.cond[self.name].release()
 
     def load(self):
         super(MessageWriterIngestion, self).load()
@@ -215,39 +226,46 @@ class MessageWriterIngestion(MessageBaseWriter, threading.Thread):
             sh.Logger.error(self, e)
             raise SystemExit(1)
 
-    def construct_msg(self, fields):
-        msglist = super(MessageWriterIngestion, self).construct_msg(fields)
-        json_msgs = []
+    def _construct_ingest_msg(self, msgs):
+        msgs = map(lambda m: {"attributes": {"type": "metric_data",
+                                            "partition_date": datetime.datetime.now().strftime('%Y-%m-%d')},
+                            "data": self._b64enc_msg(m)}, msgs)
+        ingest_msg = {"messages": msgs}
+        return json.dumps(ingest_msg)
 
-        for m in msglist:
-            ingest_msg = {"messages": [{"attributes": {"type": "metric_data",
-                                                       "partition_date": datetime.datetime.now().strftime(self.partition_date_format)},
-                                        "data": self._b64enc_msg(m)}]}
-            json_msgs.append(json.dumps(ingest_msg))
-
-        return json_msgs
-
-    def write_msg(self, fields):
+    def write_msg(self, msgs):
         now = datetime.datetime.utcnow().date()
+        not_valid, not_interval, valid = [], [], []
 
-        if self.is_validmsg(fields):
-            if self.is_ininterval(fields['message-id'], fields['timestamp'], now):
-                msglist = self.construct_msg(fields)
-                for b64jsonmsg in msglist:
-                    try:
-                        response = requests.post('https://' + self.host + self.urlapi,
-                                                 data=b64jsonmsg,
-                                                 verify=False)
-                        response.raise_for_status()
-                        sh.nummsging += 1
-                    except requests.exceptions.RequestException as e:
-                        if isinstance(e, requests.exceptions.HTTPError):
-                            if e.response.status_code >= 400:
-                                # TODO: disable writer
-                                pass
-                            sh.Logger.error(self, repr(e) + ' - ' + str(response.json()))
-                        else:
-                            sh.Logger.error(self, repr(e))
+        while True:
+            try:
+                msg = msgs.pop()
+                if not self.is_validmsg(msg):
+                    not_valid.append(msg)
+                elif not self.is_ininterval(msg['message-id'], msg['timestamp'], now):
+                    not_interval.append(msg)
+                else:
+                    valid.append(msg)
+            except IndexError:
+                break
+
+        valid = map(super(MessageWriterIngestion, self).construct_msg, valid)
+        valid = self._construct_ingest_msg(valid)
+
+        try:
+            response = requests.post('https://' + self.host + self.urlapi,
+                                        data=valid,
+                                        verify=False)
+            response.raise_for_status()
+            sh.nummsging += 1
+        except requests.exceptions.RequestException as e:
+            if isinstance(e, requests.exceptions.HTTPError):
+                if e.response.status_code >= 400:
+                    # TODO: disable writer
+                    pass
+                sh.Logger.error(self, repr(e) + ' - ' + str(response.json()))
+            else:
+                sh.Logger.error(self, repr(e))
 
 class MessageWriterFile(MessageBaseWriter, threading.Thread):
     def __init__(self):

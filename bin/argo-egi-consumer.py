@@ -202,8 +202,8 @@ class Daemon:
         try:
             uinfo = pwd.getpwnam(user)
             os.chown(self.pidfile, uinfo.pw_uid, uinfo.pw_gid)
-            # os.setegid(uinfo.pw_gid)
-            # os.seteuid(uinfo.pw_uid)
+            os.setegid(uinfo.pw_gid)
+            os.seteuid(uinfo.pw_uid)
         except (OSError, IOError) as e:
             sh.Logger.error(self, e)
             sh.Logger.removeHandler(handler)
