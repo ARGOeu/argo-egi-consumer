@@ -90,7 +90,26 @@ class MsgLogger:
     def removeHandler(self, hdlr):
         self.mylog.removeHandler(hdlr)
 
-class MessageBaseWriter(object):
+class MessageBaseWriter(threading.Thread):
+    def __init__(self, queuelen):
+        threading.Thread.__init__(self)
+        self.name = self.__class__.__name__
+        sh.eventtermwrit.update({self.name: threading.Event()})
+        sh.cond.update({self.name: threading.Condition()})
+        sh.msgqueues.update({self.name: {'queue': deque(), 'size': queuelen}})
+        self.load()
+
+    def run(self):
+        while True:
+            if sh.eventtermwrit[self.name].isSet():
+                break
+            sh.cond[self.name].acquire()
+            sh.cond[self.name].wait(0.2)
+            if len(sh.msgqueues[self.name]['queue']) == sh.msgqueues[self.name]['size']:
+                self.write_msg(sh.msgqueues[self.name]['queue'])
+                sh.cond[self.name].notify()
+                sh.cond[self.name].release()
+
     def load(self):
         sh.ConsumerConf.parse()
         self.date_format = '%Y-%m-%dT%H:%M:%SZ'
@@ -123,7 +142,6 @@ class MessageBaseWriter(object):
         return msglist
 
     def construct_msg(self, fields):
-        msglist = []
         msg, tags = {}, {}
 
         msg = {'service': fields['serviceType'],
@@ -181,29 +199,30 @@ class MessageBaseWriter(object):
 
         return inint
 
-    def write_msg(self, fields):
-        pass
+    def write_msg(self, msgs):
+        now = datetime.datetime.utcnow().date()
+        valid, not_interval, not_valid = [], [], []
 
-class MessageWriterIngestion(MessageBaseWriter, threading.Thread):
-    def __init__(self):
-        threading.Thread.__init__(self)
-        self.name = self.__class__.__name__
-        sh.eventtermwrit.update({self.name: threading.Event()})
-        sh.cond.update({self.name: threading.Condition()})
-        sh.msgqueues.update({self.name: {'queue': deque(), 'size': 50}})
-        self.load()
-
-    def run(self):
         while True:
-            if sh.eventtermwrit[self.name].isSet():
+            try:
+                msg = msgs.pop()
+                if self.log_wrong_formatted_msg and not self.is_validmsg(msg):
+                    not_valid.append(msg)
+                elif self.log_out_allowedtime_msg and not self.is_ininterval(msg['message-id'], msg['timestamp'], now):
+                    not_interval.append(msg)
+                elif self.is_validmsg(msg):
+                    valid.append(msg)
+            except IndexError:
                 break
-            sh.cond[self.name].acquire()
-            sh.cond[self.name].wait(0.2)
-            if len(sh.msgqueues[self.name]['queue']) == sh.msgqueues[self.name]['size']:
-                self.write_msg(sh.msgqueues[self.name]['queue'])
-                sh.cond[self.name].notify()
-                sh.cond[self.name].release()
 
+        self.valid = map(self.construct_msg, valid)
+
+        if self.log_out_allowedtime_msg:
+            self.not_interval = map(self.construct_msg, not_interval)
+        if self.log_wrong_formatted_msg:
+            self.not_valid = map(self.construct_msg, not_valid)
+
+class MessageWriterIngestion(MessageBaseWriter):
     def load(self):
         super(MessageWriterIngestion, self).load()
         self.partition_date_format ='%Y-%m-%d'
@@ -234,30 +253,16 @@ class MessageWriterIngestion(MessageBaseWriter, threading.Thread):
         return json.dumps(ingest_msg)
 
     def write_msg(self, msgs):
-        now = datetime.datetime.utcnow().date()
-        not_valid, not_interval, valid = [], [], []
+        super(MessageWriterIngestion, self).write_msg(msgs)
 
-        while True:
-            try:
-                msg = msgs.pop()
-                if not self.is_validmsg(msg):
-                    not_valid.append(msg)
-                elif not self.is_ininterval(msg['message-id'], msg['timestamp'], now):
-                    not_interval.append(msg)
-                else:
-                    valid.append(msg)
-            except IndexError:
-                break
-
-        valid = map(super(MessageWriterIngestion, self).construct_msg, valid)
-        valid = self._construct_ingest_msg(valid)
+        numsgs = len(self.valid)
+        self.valid = self._construct_ingest_msg(self.valid)
 
         try:
             response = requests.post('https://' + self.host + self.urlapi,
-                                        data=valid,
-                                        verify=False)
+                                     data=self.valid, verify=False)
             response.raise_for_status()
-            sh.nummsging += 1
+            sh.nummsging += numsgs
         except requests.exceptions.RequestException as e:
             if isinstance(e, requests.exceptions.HTTPError):
                 if e.response.status_code >= 400:
@@ -267,26 +272,7 @@ class MessageWriterIngestion(MessageBaseWriter, threading.Thread):
             else:
                 sh.Logger.error(self, repr(e))
 
-class MessageWriterFile(MessageBaseWriter, threading.Thread):
-    def __init__(self):
-        threading.Thread.__init__(self)
-        self.name = self.__class__.__name__
-        sh.eventtermwrit.update({self.name: threading.Event()})
-        sh.cond.update({self.name: threading.Condition()})
-        sh.msgqueues.update({self.name: {'queue': deque(), 'size': 50}})
-        self.load()
-
-    def run(self):
-        while True:
-            if sh.eventtermwrit[self.name].isSet():
-                break
-            sh.cond[self.name].acquire()
-            sh.cond[self.name].wait(0.2)
-            if len(sh.msgqueues[self.name]['queue']) == sh.msgqueues[self.name]['size']:
-                self.write_msg(sh.msgqueues[self.name]['queue'])
-                sh.cond[self.name].notify()
-                sh.cond[self.name].release()
-
+class MessageWriterFile(MessageBaseWriter):
     def load(self):
         super(MessageWriterFile, self).load()
         self.write_plaintxt = sh.ConsumerConf.get_option('MsgFileWritePlaintext'.lower())
@@ -344,23 +330,9 @@ class MessageWriterFile(MessageBaseWriter, threading.Thread):
         return self.filedir + self.errorfilename_template.replace('DATE', timestamp)
 
     def write_msg(self, msgs):
-        now = datetime.datetime.utcnow().date()
-        not_valid, not_interval, valid = [], [], []
+        super(MessageWriterFile, self).write_msg(msgs)
 
-        while True:
-            try:
-                msg = msgs.pop()
-                if not self.is_validmsg(msg):
-                    not_valid.append(msg)
-                elif not self.is_ininterval(msg['message-id'], msg['timestamp'], now):
-                    not_interval.append(msg)
-                else:
-                    valid.append(msg)
-            except IndexError:
-                break
-
-        valid = map(self.construct_msg, valid)
-        for m in valid:
+        for m in self.valid:
             if type(m) == tuple:
                 filename = self._create_log_filename(m[0]['timestamp'][:10])
             else:
@@ -370,8 +342,7 @@ class MessageWriterFile(MessageBaseWriter, threading.Thread):
                 self._write_to_ptxt(filename, m, 'PLAINTEXT')
 
         if self.log_out_allowedtime_msg:
-            not_interval = map(self.construct_msg, not_interval)
-            for m in not_interval:
+            for m in self.not_interval:
                 if type(m) == tuple:
                     filename = self._create_log_filename(m[0]['timestamp'][:10])
                 else:
@@ -381,7 +352,6 @@ class MessageWriterFile(MessageBaseWriter, threading.Thread):
                     self._write_to_ptxt(filename, m, 'PLAINTEXT')
 
         if self.log_wrong_formatted_msg:
-            not_valid = map(self.construct_msg, not_valid)
-            for m in not_valid:
+            for m in self.not_valid:
                 filename = self._create_error_log_filename(str(now))
                 self._write_to_ptxt(filename, m, 'WRONGFORMAT')

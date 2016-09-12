@@ -106,13 +106,13 @@ class Daemon:
         thr = threading.Thread(target=self._report, name='report')
         thr.start()
         if sh.ConsumerConf.get_option('GeneralWriteMsgIngestion'.lower()):
-            thi = MessageWriterIngestion()
+            thi = MessageWriterIngestion(100)
             thi.daemon = True
             thi.start()
             sh.writers.append(thi)
 
         if sh.ConsumerConf.get_option('GeneralWriteMsgFile'.lower()):
-            thf = MessageWriterFile()
+            thf = MessageWriterFile(50)
             thf.daemon = True
             thf.start()
             sh.writers.append(thf)
