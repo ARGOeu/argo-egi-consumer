@@ -98,6 +98,11 @@ class MessageBaseWriter(threading.Thread):
         sh.msgqueues.update({self.name: {'queue': deque(), 'size': queuelen}})
         self.load()
 
+    def refresh_qsize(self, confopt):
+        qsize = sh.ConsumerConf.get_option(confopt.lower(), optional=True)
+        qsize = 1 if not qsize else qsize
+        sh.msgqueues[self.name]['size'] = qsize
+
     def run(self):
         while True:
             if sh.eventtermwrit[self.name].isSet():
@@ -229,6 +234,7 @@ class MessageWriterIngestion(MessageBaseWriter):
         self.token = sh.ConsumerConf.get_option('MsgIngestionToken'.lower())
         self.tenat = sh.ConsumerConf.get_option('MsgIngestionTenant'.lower())
         self.urlapi = "/v1/projects/%s/topics/metric_data:publish?key=%s" % (self.tenat, self.token)
+        self.refresh_qsize('MsgIngestionBulkSize')
 
     def _b64enc_msg(self, msg):
         try:
@@ -278,6 +284,7 @@ class MessageWriterFile(MessageBaseWriter):
         self.errorfilename_template = sh.ConsumerConf.get_option('MsgFileErrorFilename'.lower())
         self.filedir = sh.ConsumerConf.get_option('MsgFileDirectory'.lower())
         self.filename_template = sh.ConsumerConf.get_option('MsgFileFilename'.lower())
+        self.refresh_qsize('MsgFileBulkSize')
 
     def _write_to_ptxt(self, log, msg, exten):
         try:

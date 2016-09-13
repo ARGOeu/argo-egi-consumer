@@ -262,7 +262,12 @@ class Daemon:
             self.stomp.listener.load()
             for w in sh.writers:
                 w.load()
+            for t in sh.writers:
+                if len(sh.msgqueues[t.name]['queue']) > 0:
+                    sh.Logger.info(self, '%s flushed %i messages from queue' % (t.name, len(sh.msgqueues[t.name]['queue'])))
+                    t.write_msg(sh.msgqueues[t.name]['queue'])
             sh.Logger.info(self, 'Config reload')
+
 
         signal.signal(signal.SIGHUP, sighuphandle)
 
