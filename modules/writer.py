@@ -229,11 +229,10 @@ class MessageBaseWriter(threading.Thread):
 class MessageWriterIngestion(MessageBaseWriter):
     def load(self):
         super(MessageWriterIngestion, self).load()
-        self.partition_date_format ='%Y-%m-%d'
         self.host = sh.ConsumerConf.get_option('MsgIngestionHost'.lower())
         self.token = sh.ConsumerConf.get_option('MsgIngestionToken'.lower())
-        self.tenat = sh.ConsumerConf.get_option('MsgIngestionTenant'.lower())
-        self.urlapi = "/v1/projects/%s/topics/metric_data:publish?key=%s" % (self.tenat, self.token)
+        self.tenant = sh.ConsumerConf.get_option('MsgIngestionTenant'.lower())
+        self.urlapi = "/v1/projects/%s/topics/metric_data:publish?key=%s" % (self.tenant, self.token)
         self.refresh_qsize('MsgIngestionBulkSize')
 
     def _b64enc_msg(self, msg):
@@ -251,8 +250,9 @@ class MessageWriterIngestion(MessageBaseWriter):
             raise SystemExit(1)
 
     def _construct_ingest_msg(self, msgs):
+        part_date = datetime.datetime.now().strftime('%Y-%m-%d')
         msgs = map(lambda m: {"attributes": {"type": "metric_data",
-                                            "partition_date": datetime.datetime.now().strftime('%Y-%m-%d')},
+                                            "partition_date": part_date},
                             "data": self._b64enc_msg(m)}, msgs)
         ingest_msg = {"messages": msgs}
         return json.dumps(ingest_msg)
