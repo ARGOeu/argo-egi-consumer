@@ -206,8 +206,8 @@ class Daemon:
         try:
             uinfo = pwd.getpwnam(user)
             os.chown(self.pidfile, uinfo.pw_uid, uinfo.pw_gid)
-            # os.setegid(uinfo.pw_gid)
-            # os.seteuid(uinfo.pw_uid)
+            os.setegid(uinfo.pw_gid)
+            os.seteuid(uinfo.pw_uid)
         except (OSError, IOError) as e:
             sh.Logger.error(self, e)
             sh.Logger.removeHandler(handler)
@@ -221,8 +221,7 @@ class Daemon:
         return True
 
     def _setup_sighandlers(self):
-        def sigtermcleanup(signum, frame):
-            sh.Logger.info(self, 'Caught SIGTERM')
+        def graceful_exit():
             sh.eventterm.set()
             for t in sh.writers:
                 if len(sh.msgqueues[t.name]['queue']) > 0:
@@ -236,17 +235,15 @@ class Daemon:
                 sh.Logger.info('StompConn' , 'Disconnected: %s:%i' % (sh.server[0], sh.server[1]))
                 raise SystemExit(3)
 
+        def sigtermcleanup(signum, frame):
+            sh.Logger.info(self, 'Caught SIGTERM')
+            graceful_exit()
+
         signal.signal(signal.SIGTERM, sigtermcleanup)
 
         def sigintcleanup(signum, frame):
             sh.Logger.info(self, 'Caught SIGINT')
-            sh.eventterm.set()
-            try:
-                self.stomp.conn.stop()
-                self.stomp.conn.disconnect()
-            except stomp.exception.NotConnectedException:
-                sh.Logger.info(self, 'Disconnected: %s:%i' % (sh.server[0], sh.server[1]))
-                raise SystemExit(3)
+            graceful_exit()
 
         signal.signal(signal.SIGINT, sigintcleanup)
 
