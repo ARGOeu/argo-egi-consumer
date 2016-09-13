@@ -8,11 +8,11 @@ sh = Shared()
 class ConsumerConf:
     def __init__(self, confile):
         self._options = {}
-        self._args = {'MsgFile': ['Directory', 'Filename', 'ErrorFilename', 'WritePlaintext'],
+        self._args = {'MsgFile': ['Directory', 'Filename', 'ErrorFilename', 'WritePlaintext', 'BulkSize'],
                       'General': ['LogName', 'AvroSchema', 'Debug',
                                   'LogWrongFormat', 'ReportWritMsgEveryHours',
                                   'WriteMsgFile', 'WriteMsgIngestion'],
-                      'MsgIngestion': ['Host', 'Token', 'Tenant'],
+                      'MsgIngestion': ['Host', 'Token', 'Tenant', 'BulkSize'],
                       'MsgRetention': ['PastDaysOk', 'FutureDaysOk', 'LogMsgOutAllowedTime'],
                       'Subscription': ['Destinations', 'IdleMsgTimeout'],
                       'Authentication': ['HostKey', 'HostCert'],
@@ -102,12 +102,14 @@ class ConsumerConf:
                 return eval(self._options[opt])
 
             elif opt.startswith('SubscriptionIdleMsgTimeout'.lower()) or \
-                 opt.startswith('STOMPTCPKeepAliveIdle'.lower()) or \
-                 opt.startswith('STOMPTCPKeepAliveInterval'.lower()) or \
-                 opt.startswith('STOMPTCPKeepAliveProbes'.lower()) or \
+                 opt.startswith('MsgFileBulkSize'.lower()) or \
+                 opt.startswith('MsgIngestionBulkSize'.lower()) or \
                  opt.startswith('MsgRetentionFutureDaysOK'.lower()) or \
                  opt.startswith('MsgRetentionPastDaysOK'.lower()) or \
                  opt.startswith('STOMPReconnectAttempts'.lower()) or \
+                 opt.startswith('STOMPTCPKeepAliveIdle'.lower()) or \
+                 opt.startswith('STOMPTCPKeepAliveInterval'.lower()) or \
+                 opt.startswith('STOMPTCPKeepAliveProbes'.lower()) or \
                  opt.startswith('SubscriptionIdleMsgTimeout'.lower()):
                 return int(self._options[opt])
 

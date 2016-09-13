@@ -68,7 +68,6 @@ class MsgLogger:
         self.rootlog.propagate = False
 
     def _module_class_name(self, obj):
-        # name = repr(obj.__module__) + '.' + repr(obj.__class__.__name__)
         if isinstance(obj, str):
             return obj
         else:

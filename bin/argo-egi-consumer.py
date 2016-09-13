@@ -106,13 +106,17 @@ class Daemon:
         thr = threading.Thread(target=self._report, name='report')
         thr.start()
         if sh.ConsumerConf.get_option('GeneralWriteMsgIngestion'.lower()):
-            thi = MessageWriterIngestion(100)
+            qsize = sh.ConsumerConf.get_option('MsgIngestionBulkSize'.lower(), optional=True)
+            qsize = 1 if not qsize else qsize
+            thi = MessageWriterIngestion(qsize)
             thi.daemon = True
             thi.start()
             sh.writers.append(thi)
 
         if sh.ConsumerConf.get_option('GeneralWriteMsgFile'.lower()):
-            thf = MessageWriterFile(50)
+            qsize = sh.ConsumerConf.get_option('MsgFileBulkSize'.lower(), optional=True)
+            qsize = 1 if not qsize else qsize
+            thf = MessageWriterFile(qsize)
             thf.daemon = True
             thf.start()
             sh.writers.append(thf)
@@ -202,8 +206,8 @@ class Daemon:
         try:
             uinfo = pwd.getpwnam(user)
             os.chown(self.pidfile, uinfo.pw_uid, uinfo.pw_gid)
-            os.setegid(uinfo.pw_gid)
-            os.seteuid(uinfo.pw_uid)
+            # os.setegid(uinfo.pw_gid)
+            # os.seteuid(uinfo.pw_uid)
         except (OSError, IOError) as e:
             sh.Logger.error(self, e)
             sh.Logger.removeHandler(handler)
