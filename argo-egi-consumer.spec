@@ -1,7 +1,7 @@
 Name: argo-egi-consumer
 Summary: A/R Comp Engine message consumer
-Version: 1.4.3
-Release: 2%{?dist}
+Version: 1.4.4
+Release: 1%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot
 Group:     EGI/SA4
@@ -51,6 +51,11 @@ if [ "$1" = 0 ] ; then
 fi
 
 %changelog
+* Fri Sep 16 2016 Daniel Vrcic <dvrcic@srce.hr> - 1.4.4-1%{?dist}
+- fixed shared class instantation
+- refactored message writer/sending code
+- introduced Ingestion API message sending
+- bulk sending/writing
 * Mon Aug 22 2016 Daniel Vrcic <dvrcic@srce.hr> - 1.4.3-2%{?dist}
 - introduced reload init script option
 - fixed restart and exiting cleanup
