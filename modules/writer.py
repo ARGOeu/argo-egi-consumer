@@ -228,6 +228,7 @@ class MessageBaseWriter(threading.Thread):
 
 class MessageWriterIngestion(MessageBaseWriter):
     def load(self):
+        self.part_date_format = '%Y-%m-%d'
         super(MessageWriterIngestion, self).load()
         self.host = sh.ConsumerConf.get_option('MsgIngestionHost'.lower())
         self.token = sh.ConsumerConf.get_option('MsgIngestionToken'.lower())
@@ -250,9 +251,11 @@ class MessageWriterIngestion(MessageBaseWriter):
             raise SystemExit(1)
 
     def _construct_ingest_msg(self, msgs):
-        part_date = datetime.datetime.now().strftime('%Y-%m-%d')
+        def part_date(timestamp):
+            d = datetime.datetime.strptime(timestamp, self.date_format)
+            return d.strftime(self.part_date_format)
         msgs = map(lambda m: {"attributes": {"type": "metric_data",
-                                            "partition_date": part_date},
+                                            "partition_date": part_date(m['timestamp'])},
                             "data": self._b64enc_msg(m)}, msgs)
         ingest_msg = {"messages": msgs}
         return json.dumps(ingest_msg)
