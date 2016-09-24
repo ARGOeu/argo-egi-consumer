@@ -71,7 +71,6 @@ fi
 - message retention configurable
   https://github.com/ARGOeu/ARGO/issues/185
 - package dependancy revised
->>>>>>> 0953ed3f9be78862fa416c81ecdd099cbf9297a0
 * Mon Jan 4 2016 Daniel Vrcic <dvrcic@srce.hr> - 1.4.2-1%{?dist}
 - configurable logger name
   https://github.com/ARGOeu/ARGO/issues/178
