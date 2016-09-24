@@ -51,6 +51,8 @@ if [ "$1" = 0 ] ; then
 fi
 
 %changelog
+* Sat Sep 24 2016 Themis Zamani <themiszamani@gmail.com> - 1.4.3-1%{?dist}
+ - New RPM package release
 * Sun Feb 14 2016 Daniel Vrcic <dvrcic@srce.hr> - 1.4.3-1%{?dist}
 - updated README
   https://github.com/ARGOeu/ARGO/issues/182
