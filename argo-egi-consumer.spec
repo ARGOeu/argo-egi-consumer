@@ -7,7 +7,8 @@ Buildroot: %{_tmppath}/%{name}-buildroot
 Group:     EGI/SA4
 BuildArch: noarch
 Source0:   %{name}-%{version}.tar.gz
-Requires: stomppy >= 3.1.6
+Requires: stomppy >= 3.1.6, stomppy < 4
+Requires: avro
 Obsoletes: ar-consumer
 
 %description
@@ -52,6 +53,25 @@ fi
 %changelog
 * Sat Sep 24 2016 Themis Zamani <themiszamani@gmail.com> - 1.4.3-1%{?dist}
  - New RPM package release
+* Sun Feb 14 2016 Daniel Vrcic <dvrcic@srce.hr> - 1.4.3-1%{?dist}
+- updated README
+  https://github.com/ARGOeu/ARGO/issues/182
+- consistent log messages between daemon and nofork mode
+- plaintext option moved to general section
+- log wrong formatted messages
+- revised plaintxt extension
+- catch keyint in nofork mode
+- retention period options as integers
+- revised process exiting
+- handler for stomppy logger
+  https://github.com/ARGOeu/ARGO/issues/186
+- config option checks moved to parser class
+- DATE placeholder instead of string operator
+- refactored writing of messages
+- message retention configurable
+  https://github.com/ARGOeu/ARGO/issues/185
+- package dependancy revised
+>>>>>>> 0953ed3f9be78862fa416c81ecdd099cbf9297a0
 * Mon Jan 4 2016 Daniel Vrcic <dvrcic@srce.hr> - 1.4.2-1%{?dist}
 - configurable logger name
   https://github.com/ARGOeu/ARGO/issues/178
