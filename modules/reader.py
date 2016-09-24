@@ -65,23 +65,18 @@ class DestListener(stomp.ConnectionListener):
         lines = message.split('\n')
         fields = dict()
 
-        try:
-            #header fields
-            fields.update(headers)
-            # body fields
-            for line in lines:
-                splitLine = line.split(': ', 1)
-                if len(splitLine) > 1:
-                    key = splitLine[0]
-                    value = splitLine[1]
-                    fields[key] = value.decode('utf-8', 'replace')
+        #header fields
+        fields.update(headers)
+        # body fields
+        for line in lines:
+            splitLine = line.split(': ', 1)
+            if len(splitLine) > 1:
+                key = splitLine[0]
+                value = splitLine[1]
+                fields[key] = value.decode('utf-8', 'replace')
 
-            self.writer.writeMessage(fields)
-            sh.nummsg += 1
-
-        except Exception as inst:
-            sh.Logger.error('Error parsing message: HEADERS: %s BODY: %s' % (headers, message))
-
+        self.writer.writeMessage(fields)
+        sh.nummsg += 1
 
 class MessageReader:
     def __init__(self):
@@ -94,6 +89,7 @@ class MessageReader:
 
     def load(self):
         sh.ConsumerConf.parse()
+
         tupleserv = sh.ConsumerConf.get_option('BrokerServer'.lower())
         if self._wastupleserv and tupleserv != self._wastupleserv:
             self._reconnconfreload = True
@@ -101,14 +97,14 @@ class MessageReader:
             self._reconnconfreload = False
         self._wastupleserv = tupleserv
         self.msgServers = deque(tupleserv)
-        self.listenerIdleTimeout = int(sh.ConsumerConf.get_option('SubscriptionIdleMsgTimeout'.lower()))
-        ldest = sh.ConsumerConf.get_option('SubscriptionDestinations'.lower()).split(',')
-        self.destinations = [t.strip() for t in ldest]
-        self.useSSL = eval(sh.ConsumerConf.get_option('STOMPUseSSL'.lower()))
-        self.keepaliveidle = int(sh.ConsumerConf.get_option('STOMPTCPKeepAliveIdle'.lower()))
-        self.keepaliveint = int(sh.ConsumerConf.get_option('STOMPTCPKeepAliveInterval'.lower()))
-        self.keepaliveprobes = int(sh.ConsumerConf.get_option('STOMPTCPKeepAliveProbes'.lower()))
-        self.reconnects = int(sh.ConsumerConf.get_option('STOMPReconnectAttempts'.lower()))
+
+        self.listenerIdleTimeout = sh.ConsumerConf.get_option('SubscriptionIdleMsgTimeout'.lower())
+        self.destinations = sh.ConsumerConf.get_option('SubscriptionDestinations'.lower())
+        self.useSSL = sh.ConsumerConf.get_option('STOMPUseSSL'.lower())
+        self.keepaliveidle = sh.ConsumerConf.get_option('STOMPTCPKeepAliveIdle'.lower())
+        self.keepaliveint = sh.ConsumerConf.get_option('STOMPTCPKeepAliveInterval'.lower())
+        self.keepaliveprobes = sh.ConsumerConf.get_option('STOMPTCPKeepAliveProbes'.lower())
+        self.reconnects = sh.ConsumerConf.get_option('STOMPReconnectAttempts'.lower())
         self.SSLCertificate = sh.ConsumerConf.get_option('AuthenticationHostKey'.lower())
         self.SSLKey = sh.ConsumerConf.get_option('AuthenticationHostCert'.lower())
         self._hours = sh.ConsumerConf.get_option('GeneralReportWritMsgEveryHours'.lower(), optional=True)
@@ -129,6 +125,7 @@ class MessageReader:
         sh.Logger.info("Cycle to broker %s:%i" % (self.server[0], self.server[1]))
         self._listconns.append(self.conn)
         self.msgServers.rotate(-1)
+        self.wasserver = self.server
 
         self.conn.set_listener('DestListener', self.listener)
 
@@ -204,6 +201,7 @@ class MessageReader:
                             conn.stop()
                             conn.disconnect()
                         except (socket.error, stomp.exception.NotConnectedException):
+                            sh.Logger.info('Disconnected: %s:%i' % (self.wasserver[0], self.wasserver[1]))
                             self.listener.connected = False
                             self._reconnconfreload = False
                     self._listconns = []
