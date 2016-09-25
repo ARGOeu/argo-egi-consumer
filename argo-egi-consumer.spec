@@ -52,9 +52,9 @@ fi
 
 %changelog
 * Sun Sep 25 2016 Themis Zamani <themiszamani@gmail.com> - 1.4.4-1%{?dist}
- - New RPM package release
+- New RPM package release
 * Sat Sep 24 2016 Themis Zamani <themiszamani@gmail.com> - 1.4.3-1%{?dist}
- - New RPM package release
+- New RPM package release
 * Sun Feb 14 2016 Daniel Vrcic <dvrcic@srce.hr> - 1.4.3-1%{?dist}
 - updated README
   https://github.com/ARGOeu/ARGO/issues/182
