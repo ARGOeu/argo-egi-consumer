@@ -23,13 +23,18 @@ stop)
 	daemon $DAEMON_PATH --stop --config $CONFIG
 	echo
 ;;
+reload)
+	echo -n $"Reloading $PROG_NAME: "
+	daemon $DAEMON_PATH --reload --config $CONFIG
+	echo
+;;
 restart)
 	echo -n $"Restarting $PROG_NAME: "
 	daemon $DAEMON_PATH --restart --config $CONFIG
 	echo
 ;;
 *)
-	echo "Usage: $0 {status|start|stop|restart}"
+	echo "Usage: $0 {status|start|stop|restart|reload}"
 	exit 1
 esac
 
