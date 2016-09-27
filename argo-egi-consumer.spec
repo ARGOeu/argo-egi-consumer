@@ -1,7 +1,7 @@
 Name: argo-egi-consumer
 Summary: A/R Comp Engine message consumer
-Version: 1.4.3
-Release: 2%{?dist}
+Version: 1.4.5
+Release: 1%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot
 Group:     EGI/SA4
@@ -51,6 +51,10 @@ if [ "$1" = 0 ] ; then
 fi
 
 %changelog
+* Tue Sep 27 2016 Themis Zamani <themiszamani@gmail.com> - 1.4.5-1%{?dist}
+- New rpm package release
+* Sun Sep 25 2016 Themis Zamani <themiszamani@gmail.com> - 1.4.4-1%{?dist}
+- New rpm package release
 * Mon Aug 22 2016 Daniel Vrcic <dvrcic@srce.hr> - 1.4.3-2%{?dist}
 - introduced reload init script option
 - fixed restart and exiting cleanup
