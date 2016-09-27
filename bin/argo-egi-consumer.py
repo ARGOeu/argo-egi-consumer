@@ -24,8 +24,8 @@
 # the EGI-InSPIRE project through the European Commission's 7th
 # Framework Programme (contract # INFSO-RI-261323)
 
-from argo_egi_consumer.reader import MessageReader
-from argo_egi_consumer.writer import MsgLogger, LOGFORMAT
+from argo_egi_consumer.reader import StompConn
+from argo_egi_consumer.writer import MsgLogger, LOGFORMAT, MessageWriterFile, MessageWriterIngestion
 from argo_egi_consumer.shared import SingletonShared as Shared
 from argo_egi_consumer.config import ConsumerConf
 
@@ -39,6 +39,8 @@ import socket
 import stomp
 import sys, os, time, atexit
 import threading
+
+from collections import deque
 
 # topic deamon defaults
 pidfile = '/var/run/argo-egi-consumer-%s.pid'
@@ -56,6 +58,99 @@ class Daemon:
         self.stderr = stderr
         self.pidfile = pidfile
         self._nofork = nofork
+        self._hours = sh.ConsumerConf.get_option('GeneralReportWritMsgEveryHours'.lower(), optional=True)
+        self._nummsgs_evsec = 3600*float(self._hours) if self._hours else 3600*24
+
+    def _report(self):
+        def msgs_stat(dur):
+            sh.Logger.info('StompConn', 'Received %i messages in %.2f hours' %
+                        (sh.nummsgrecv, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+            if sh.ConsumerConf.get_option('GeneralWriteMsgFile'.lower()):
+                sh.Logger.info('MessageWriterFile', 'Written %i messages in %.2f hours' %
+                            (sh.nummsgfile, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+            if sh.ConsumerConf.get_option('GeneralWriteMsgIngestion'.lower()):
+                sh.Logger.info('MessageWriterIngestion', 'Sent %i messages in %.2f hours' %
+                            (sh.nummsging, dur/3600 if dur/3600 < float(self._hours) else float(self._hours)))
+
+        s = 0.0
+        while True:
+            if sh.eventusr1.isSet():
+                now = time.time()
+                dur = now - sh.stime
+                sh.Logger.info('StompConn', 'Connected to %s:%i for %.2f hours' % (sh.server[0], sh.server[1], (now - sh.tconn)/3600))
+                sh.Logger.info('StompConn', 'Subscribed to %s' % (sh.deststr[:len(sh.deststr) - 2]))
+                msgs_stat(dur)
+                sh.eventusr1.clear()
+
+            if sh.eventterm.isSet():
+                dur = time.time() - sh.stime
+                for t in sh.writers:
+                    t.join()
+                msgs_stat(dur)
+                break
+
+            if s < self._nummsgs_evsec:
+                sh.eventterm.wait(0.2)
+                s += 0.2
+
+            else:
+                if self.stomp.listener.connected:
+                    dur = time.time() - sh.stime
+                    sh.Logger.info(self, 'Report every %.2f hour' % float(self._hours))
+                    msgs_stat(dur)
+                    sh.Logger.info(self, 'Counters reset')
+                    sh.nummsgrecv, sh.nummsgfile, sh.nummsging, s = 0, 0, 0, 0
+                    sh.stime = time.time()
+
+    def _postdaemon(self):
+        thr = threading.Thread(target=self._report, name='report')
+        thr.start()
+        if sh.ConsumerConf.get_option('GeneralWriteMsgIngestion'.lower()):
+            qsize = sh.ConsumerConf.get_option('MsgIngestionBulkSize'.lower(), optional=True)
+            qsize = 1 if not qsize else qsize
+            thi = MessageWriterIngestion(qsize)
+            thi.daemon = True
+            thi.start()
+            sh.writers.append(thi)
+
+        if sh.ConsumerConf.get_option('GeneralWriteMsgFile'.lower()):
+            qsize = sh.ConsumerConf.get_option('MsgFileBulkSize'.lower(), optional=True)
+            qsize = 1 if not qsize else qsize
+            thf = MessageWriterFile(qsize)
+            thf.daemon = True
+            thf.start()
+            sh.writers.append(thf)
+
+    def _writepid(self, pid):
+        pf = file(self.pidfile, 'w+')
+        try:
+            pf.write("%s\n" % pid)
+        except (IOError, OSError) as e:
+            sh.Logger.error(self, e)
+            sh.Logger.removeHandler(handler)
+            raise SystemExit(1)
+        finally:
+            pf.close()
+
+    def _getpid(self):
+        pid = None
+        if os.path.exists(self.pidfile):
+            with open(self.pidfile, 'r') as con:
+                pid = int(con.read().strip())
+        return pid
+
+    def _delpid(self):
+        handler = logging.StreamHandler()
+        sh.Logger.addHandler(handler)
+        try:
+            os.seteuid(0)
+            os.setegid(0)
+            sh.Logger.info(self, 'Removing pidfile: %s' % self.pidfile)
+            os.remove(self.pidfile)
+        except (IOError, OSError) as e:
+            sh.Logger.error(self, e)
+            sh.Logger.removeHandler(handler)
+            raise SystemExit(1)
 
     def _daemonize(self):
         handler = logging.StreamHandler()
@@ -68,7 +163,7 @@ class Daemon:
                 if pid > 0:
                     raise SystemExit(0)
             except OSError, e:
-                sh.Logger.error("fork #1 failed: %d (%s)\n" % (e.errno, e.strerror))
+                sh.Logger.error(self, "fork #1 failed: %d (%s)" % (e.errno, e.strerror))
                 sh.Logger.removeHandler(handler)
                 raise SystemExit(1)
 
@@ -78,7 +173,7 @@ class Daemon:
                 # decouple from parent environment
                 os.setsid()
             except OSError as e:
-                sh.Logger.error('%s %s' % (str(self.__class__), e))
+                sh.Logger.error(self, e)
                 sh.Logger.removeHandler(handler)
                 raise SystemExit(1)
 
@@ -88,7 +183,7 @@ class Daemon:
                 if pid > 0:
                     raise SystemExit(0)
             except OSError, e:
-                sh.Logger.error("fork #2 failed: %d (%s)\n" % (e.errno, e.strerror))
+                sh.Logger.error(self, "fork #2 failed: %d (%s)" % (e.errno, e.strerror))
                 sh.Logger.removeHandler(handler)
                 raise SystemExit(1)
 
@@ -102,16 +197,11 @@ class Daemon:
             os.dup2(so.fileno(), sys.stdout.fileno())
             os.dup2(se.fileno(), sys.stderr.fileno())
 
-        # write pidfile
+        # register exit handler
         atexit.register(self._delpid)
-        pid = str(os.getpid())
 
-        try:
-            file(self.pidfile,'w+').write("%s\n" % pid)
-        except (IOError, OSError) as e:
-            sh.Logger.error('%s %s' % (str(self.__class__), e))
-            sh.Logger.removeHandler(handler)
-            raise SystemExit(1)
+        # write pid file
+        self._writepid(str(os.getpid()))
 
         try:
             uinfo = pwd.getpwnam(user)
@@ -119,19 +209,7 @@ class Daemon:
             os.setegid(uinfo.pw_gid)
             os.seteuid(uinfo.pw_uid)
         except (OSError, IOError) as e:
-            sh.Logger.error('%s %s' % (str(self.__class__), e))
-            sh.Logger.removeHandler(handler)
-            raise SystemExit(1)
-
-    def _delpid(self):
-        handler = logging.StreamHandler()
-        sh.Logger.addHandler(handler)
-        try:
-            os.seteuid(0)
-            os.setegid(0)
-            os.remove(self.pidfile)
-        except (IOError, OSError) as e:
-            sh.Logger.error('%s %s' % (str(self.__class__), e))
+            sh.Logger.error(self, e)
             sh.Logger.removeHandler(handler)
             raise SystemExit(1)
 
@@ -143,129 +221,128 @@ class Daemon:
         return True
 
     def _setup_sighandlers(self):
-        def sigtermcleanup(signum, frame):
-            sh.Logger.info('Caught SIGTERM')
+        def graceful_exit():
             sh.eventterm.set()
+            for t in sh.writers:
+                if len(sh.msgqueues[t.name]['queue']) > 0:
+                    t.write_msg(sh.msgqueues[t.name]['queue'])
+                sh.eventtermwrit[t.name].set()
+
             try:
-                self.reader.conn.stop()
-                self.reader.conn.disconnect()
+                self.stomp.conn.stop()
+                self.stomp.conn.disconnect()
             except stomp.exception.NotConnectedException:
-                sh.Logger.info('Disconnected: %s:%i' % (self.reader.server[0], self.reader.server[1]))
-                if os.path.exists(self.pidfile):
-                    sh.Logger.info('Removing pidfile: %s' % self.pidfile)
-                    os.remove(self.pidfile)
-                sh.Logger.info('Ended')
-                os._exit(0)
+                sh.Logger.info('StompConn' , 'Disconnected: %s:%i' % (sh.server[0], sh.server[1]))
+                raise SystemExit(3)
+
+        def sigtermcleanup(signum, frame):
+            sh.Logger.info(self, 'Caught SIGTERM')
+            graceful_exit()
 
         signal.signal(signal.SIGTERM, sigtermcleanup)
 
         def sigintcleanup(signum, frame):
-            sh.Logger.info('Caught SIGINT')
-            try:
-                self.reader.conn.stop()
-                self.reader.conn.disconnect()
-            except stomp.exception.NotConnectedException:
-                sh.Logger.info('Disconnected: %s:%i' % (self.reader.server[0], self.reader.server[1]))
-                if os.path.exists(self.pidfile):
-                    sh.Logger.info('Removing pidfile: %s' % self.pidfile)
-                    os.remove(self.pidfile)
-                sh.Logger.info('Ended')
-                os._exit(0)
+            sh.Logger.info(self, 'Caught SIGINT')
+            graceful_exit()
 
         signal.signal(signal.SIGINT, sigintcleanup)
 
         def sigusr1handle(signum, frame):
-            sh.Logger.info('Caught SIGUSR1')
+            sh.Logger.info(self, 'Caught SIGUSR1')
             sh.eventusr1.set()
 
         signal.signal(signal.SIGUSR1, sigusr1handle)
 
         def sighuphandle(signum, frame):
-            sh.Logger.info('Caught SIGHUP')
-            self.reader.load()
-            self.reader.listener.load()
-            self.reader.listener.writer.load()
-            sh.Logger.info('Config reload')
+            sh.Logger.info(self, 'Caught SIGHUP')
+            self.stomp.load()
+            self.stomp.listener.load()
+            for w in sh.writers:
+                w.load()
+            for t in sh.writers:
+                if len(sh.msgqueues[t.name]['queue']) > 0:
+                    sh.Logger.info(self, '%s flushed %i messages from queue' % (t.name, len(sh.msgqueues[t.name]['queue'])))
+                    t.write_msg(sh.msgqueues[t.name]['queue'])
+            sh.Logger.info(self, 'Config reload')
+
 
         signal.signal(signal.SIGHUP, sighuphandle)
 
-    def start(self):
-        try:
-            pf = file(self.pidfile,'r')
-            pid = int(pf.read().strip())
-            pf.close()
-        except IOError:
-            pid = None
+    def start(self, isrestart):
+        if not isrestart:
+            sh.Logger.warning(self, "Starting...")
 
+        pid = self._getpid()
         if pid:
             if self._is_pid_running(pid):
                 message = "pidfile %s already exist. Daemon already running?\n" % self.pidfile
-                sh.Logger.error(message)
-                raise SystemExit(1)
+                sh.Logger.error(self, message)
+                raise SystemExit(3)
             else:
-                self._delpid
+                self._delpid()
 
         self._setup_sighandlers()
         # Start the daemon
         self._daemonize()
+        self._postdaemon()
         self._run()
 
-    def stop(self):
-        try:
-            pf = file(self.pidfile,'r')
-            pid = int(pf.read().strip())
-            pf.close()
-        except IOError:
-            pid = None
+    def stop(self, isrestart):
+        if not isrestart:
+            sh.Logger.warning(self, "Stopping...")
 
+        pid = self._getpid()
         if not pid:
             message = "pidfile %s does not exist. Daemon not running?\n" % self.pidfile
-            sh.Logger.error(message)
-            return
+            sh.Logger.error(self, message)
+            raise SystemExit(3)
         else:
             os.kill(pid, signal.SIGTERM)
 
+    def reload(self):
+        pid = self._getpid()
+        if pid:
+            os.kill(self._getpid(), signal.SIGHUP)
+
     def restart(self):
-        self.stop()
-        self.start()
+        sh.Logger.warning(self, "Restarting...")
+        self.stop(True)
+        time.sleep(1)
+        self.start(True)
 
     def status(self):
         # Get the pid from the pidfile
         handler = logging.StreamHandler()
         global log
         sh.Logger.addHandler(handler)
-        try:
-            pf = file(self.pidfile,'r')
-            pid = int(pf.read().strip())
-            pf.close()
-        except IOError:
-            pid = None
+        pid = self._getpid()
 
         if pid:
             if self._is_pid_running(pid):
-                sh.Logger.info("%i is running..." % (pid))
+                sh.Logger.info(self, "%i is running..." % (pid))
+                os.kill(self._getpid(), signal.SIGUSR1)
                 sh.Logger.removeHandler(handler)
-                return 0
+                raise SystemExit(0)
             else:
-                sh.Logger.info("Stopped")
+                sh.Logger.info(self, "Stopped")
                 sh.Logger.removeHandler(handler)
-                return 3
-
+                raise SystemExit(3)
         else:
-            sh.Logger.info("Stopped")
+            sh.Logger.info(self, "Stopped")
             sh.Logger.removeHandler(handler)
-            return 3
+            raise SystemExit(3)
 
     def _run(self):
-        self.reader = MessageReader()
-        sh.Logger.info("Started")
+        self.stomp = StompConn()
+        sh.Logger.info(self, "Started")
         sh.seta('stime', time.time())
-        self.reader.run()
+        self.stomp.run()
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--start', action='store_true')
     parser.add_argument('--stop', action='store_true')
+    parser.add_argument('--reload', action='store_true')
     parser.add_argument('--restart', action='store_true')
     parser.add_argument('--config', nargs=1, required=True)
     parser.add_argument('--nofork', action='store_true')
@@ -276,20 +353,38 @@ def main():
     sh.ConsumerConf.parse()
     sh.seta('eventusr1', threading.Event())
     sh.seta('eventterm', threading.Event())
+    sh.seta('eventtermwrit', {})
+    sh.seta('eventwrite', threading.Event())
+    sh.seta('msgqueues', {})
+    sh.seta('cond', {})
     sh.seta('thlock', threading.Lock())
     clname = sh.ConsumerConf.get_option('GeneralLogName'.lower(), optional=True)
     sh.seta('Logger', MsgLogger(clname if clname else os.path.basename(sys.argv[0])))
-    sh.seta('nummsg', 0)
+
+    if not sh.ConsumerConf.get_option('GeneralWriteMsgFile'.lower()) and \
+            not sh.ConsumerConf.get_option('GeneralWriteMsgIngestion'.lower()):
+        sys.stderr.write('%s: At least one writer should be enabled\n' % clname)
+        raise SystemExit(1)
+
+    sh.seta('nummsgfile', 0)
+    sh.seta('nummsging', 0)
+    sh.seta('nummsgrecv', 0)
+    sh.seta('server', [])
+    sh.seta('writers', [])
+    sh.seta('deststr', '')
+    sh.seta('tconn', 0)
     md = hashlib.md5()
     md.update(args.config[0])
     daemon = Daemon(pidfile % md.hexdigest(), name=daemonname, nofork=args.nofork)
 
     if args.start:
-        daemon.start()
+        daemon.start(False)
     elif args.stop:
-        daemon.stop()
+        daemon.stop(False)
     elif args.restart:
         daemon.restart()
+    elif args.reload:
+        daemon.reload()
     elif args.status:
         daemon.status()
     else:
