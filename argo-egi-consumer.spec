@@ -1,6 +1,6 @@
 Name: argo-egi-consumer
 Summary: A/R Comp Engine message consumer
-Version: 1.4.5
+Version: 1.4.6
 Release: 1%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot
@@ -51,6 +51,11 @@ if [ "$1" = 0 ] ; then
 fi
 
 %changelog
+* Wed Sep 28 2016 Daniel Vrcic <dvrcic@srce.hr> - 1.4.6-1%{?dist} 
+- fixed shared class instantation
+- refactored message writer/sending code
+- introduced Ingestion API message sending
+- bulk sending/writing
 * Tue Sep 27 2016 Themis Zamani <themiszamani@gmail.com> - 1.4.5-1%{?dist}
 - New rpm package release
 * Sun Sep 25 2016 Themis Zamani <themiszamani@gmail.com> - 1.4.4-1%{?dist}
