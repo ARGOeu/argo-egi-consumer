@@ -24,7 +24,6 @@
 # Framework Programme (contract # INFSO-RI-261323)
 
 import avro.schema
-import datetime
 import json
 import logging
 import os
@@ -187,6 +186,7 @@ class MessageBaseWriter(threading.Thread):
         inint = False
 
         try:
+            import datetime
             msgTime = datetime.datetime.strptime(timestamp, self.date_format).date()
             nowTime = datetime.datetime.utcnow().date()
         except ValueError as e:
@@ -204,6 +204,7 @@ class MessageBaseWriter(threading.Thread):
         return inint
 
     def write_msg(self, msgs):
+        import datetime
         now = datetime.datetime.utcnow().date()
         valid, not_interval, not_valid = [], [], []
 
@@ -252,6 +253,7 @@ class MessageWriterIngestion(MessageBaseWriter):
 
     def _construct_ingest_msg(self, msgs):
         def part_date(timestamp):
+            import datetime
             d = datetime.datetime.strptime(timestamp, self.date_format)
             return d.strftime(self.part_date_format)
         msgs = map(lambda m: {"attributes": {"type": "metric_data",
