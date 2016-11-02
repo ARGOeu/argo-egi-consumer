@@ -1,6 +1,6 @@
 Name: argo-egi-consumer
 Summary: A/R Comp Engine message consumer
-Version: 1.4.6
+Version: 2.0.0
 Release: 1%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot
@@ -51,6 +51,8 @@ if [ "$1" = 0 ] ; then
 fi
 
 %changelog
+* Wed Nov 2 2016 Daniel Vrcic <dvrcic@srce.hr> - 2.0.0-1%{?dist}
+- bump major version number because of introduced backward incompatible changes
 * Wed Sep 28 2016 Daniel Vrcic <dvrcic@srce.hr> - 1.4.6-1%{?dist} 
 - fixed shared class instantation
 - refactored message writer/sending code
