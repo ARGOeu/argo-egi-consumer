@@ -1,7 +1,7 @@
 Name: argo-egi-consumer
 Summary: A/R Comp Engine message consumer
 Version: 2.0.0
-Release: 1%{?dist}
+Release: 2%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot
 Group:     EGI/SA4
@@ -9,6 +9,7 @@ BuildArch: noarch
 Source0:   %{name}-%{version}.tar.gz
 Requires: stomppy >= 3.1.6, stomppy < 4
 Requires: avro
+Requires: python-requests
 Obsoletes: ar-consumer
 
 %description
@@ -51,6 +52,8 @@ if [ "$1" = 0 ] ; then
 fi
 
 %changelog
+* Mon Nov 7 2016 Daniel Vrcic <dvrcic@srce.hr> - 2.0.0-2%{?dist}
+- added needed dependancy
 * Wed Nov 2 2016 Daniel Vrcic <dvrcic@srce.hr> - 2.0.0-1%{?dist}
 - bump major version number because of introduced backward incompatible changes
 * Wed Sep 28 2016 Daniel Vrcic <dvrcic@srce.hr> - 1.4.6-1%{?dist} 
