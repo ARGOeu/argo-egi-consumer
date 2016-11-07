@@ -1,7 +1,7 @@
 Name: argo-egi-consumer
 Summary: A/R Comp Engine message consumer
 Version: 2.0.0
-Release: 2%{?dist}
+Release: 3%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot
 Group:     EGI/SA4
@@ -52,6 +52,8 @@ if [ "$1" = 0 ] ; then
 fi
 
 %changelog
+* Mon Nov 7 2016 Daniel Vrcic <dvrcic@srce.hr> - 2.0.0-3%{?dist}
+- handle paired servtype msgs in base writer 
 * Mon Nov 7 2016 Daniel Vrcic <dvrcic@srce.hr> - 2.0.0-2%{?dist}
 - added needed dependancy
 * Wed Nov 2 2016 Daniel Vrcic <dvrcic@srce.hr> - 2.0.0-1%{?dist}
