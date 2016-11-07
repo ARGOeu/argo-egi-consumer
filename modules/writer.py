@@ -167,7 +167,8 @@ class MessageBaseWriter(threading.Thread):
 
         if ',' in fields['serviceType']:
             two_msgs = self._split_in_two(msg, fields)
-            return two_msgs[0], two_msgs[1]
+            self._second_pairedservtype_msg.append(two_msgs[1])
+            return two_msgs[0]
         else:
             return msg
 
@@ -220,12 +221,21 @@ class MessageBaseWriter(threading.Thread):
             except IndexError:
                 break
 
+        self._second_pairedservtype_msg = []
         self.valid = map(self.construct_msg, valid)
+        if self._second_pairedservtype_msg:
+            self.valid += self._second_pairedservtype_msg
 
         if self.log_out_allowedtime_msg:
+            self._second_pairedservtype_msg = []
             self.not_interval = map(self.construct_msg, not_interval)
+            if self._second_pairedservtype_msg:
+                self.not_interval += self._second_pairedservtype_msg
         if self.log_wrong_formatted_msg:
+            self._second_pairedservtype_msg = []
             self.not_valid = map(self.construct_msg, not_valid)
+            if self._second_pairedservtype_msg:
+                self.not_valid += self._second_pairedservtype_msg
 
 class MessageWriterIngestion(MessageBaseWriter):
     def load(self):
@@ -295,11 +305,7 @@ class MessageWriterFile(MessageBaseWriter):
         try:
             filename = '.'.join(log.split('.')[:-1]) + '.%s' % exten
             plainfile = open(filename, 'a+')
-            if type(msg) == tuple:
-                for m in msg:
-                    plainfile.write(json.dumps(m) + '\n')
-            else:
-                plainfile.write(json.dumps(msg) + '\n')
+            plainfile.write(json.dumps(m) + '\n')
             plainfile.close()
         except (IOError, OSError) as e:
             sh.Logger.error(self, e)
@@ -315,15 +321,9 @@ class MessageWriterFile(MessageBaseWriter):
                 avroFile = open(log, 'w+')
                 writer = DataFileWriter(avroFile, DatumWriter(), self.schema)
 
-            if type(msg) == tuple:
-                for m in msg:
-                    writer.append(m)
-                if count:
-                    sh.nummsgfile += len(msg)
-            else:
-                writer.append(msg)
-                if count:
-                    sh.nummsgfile += 1
+            writer.append(msg)
+            if count:
+                sh.nummsgfile += 1
 
         except (IOError, OSError) as e:
             sh.Logger.error(self, e)
@@ -344,20 +344,14 @@ class MessageWriterFile(MessageBaseWriter):
         super(MessageWriterFile, self).write_msg(msgs)
 
         for m in self.valid:
-            if type(m) == tuple:
-                filename = self._create_log_filename(m[0]['timestamp'][:10])
-            else:
-                filename = self._create_log_filename(m['timestamp'][:10])
+            filename = self._create_log_filename(m['timestamp'][:10])
             self._write_to_avro(filename, m, count=True)
             if self.write_plaintxt:
                 self._write_to_ptxt(filename, m, 'PLAINTEXT')
 
         if self.log_out_allowedtime_msg:
             for m in self.not_interval:
-                if type(m) == tuple:
-                    filename = self._create_log_filename(m[0]['timestamp'][:10])
-                else:
-                    filename = self._create_log_filename(m['timestamp'][:10])
+                filename = self._create_log_filename(m['timestamp'][:10])
                 self._write_to_avro(filename, m, count=True)
                 if self.write_plaintxt:
                     self._write_to_ptxt(filename, m, 'PLAINTEXT')

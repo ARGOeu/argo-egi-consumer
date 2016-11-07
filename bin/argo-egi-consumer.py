@@ -43,7 +43,7 @@ import threading
 from collections import deque
 
 # topic deamon defaults
-pidfile = '/var/run/argo-egi-consumer-%s.pid'
+pidfile = '/var/run/%s-%s.pid'
 daemonname = 'argo-egi-consumer'
 user = 'arstats'
 conf, log = None, None
@@ -375,7 +375,7 @@ def main():
     sh.seta('tconn', 0)
     md = hashlib.md5()
     md.update(args.config[0])
-    daemon = Daemon(pidfile % md.hexdigest(), name=daemonname, nofork=args.nofork)
+    daemon = Daemon(pidfile % (clname, md.hexdigest()), name=daemonname, nofork=args.nofork)
 
     if args.start:
         daemon.start(False)
