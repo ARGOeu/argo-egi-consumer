@@ -227,13 +227,13 @@ class Daemon:
                 if len(sh.msgqueues[t.name]['queue']) > 0:
                     t.write_msg(sh.msgqueues[t.name]['queue'])
                 sh.eventtermwrit[t.name].set()
-
             try:
-                self.stomp.conn.stop()
+                # self.stomp.conn.stop()
                 self.stomp.conn.disconnect()
             except stomp.exception.NotConnectedException:
                 sh.Logger.info('StompConn' , 'Disconnected: %s:%i' % (sh.server[0], sh.server[1]))
                 raise SystemExit(3)
+            raise SystemExit(0)
 
         def sigtermcleanup(signum, frame):
             sh.Logger.info(self, 'Caught SIGTERM')
