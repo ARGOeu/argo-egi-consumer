@@ -62,7 +62,7 @@ class MsgLogger:
         self.mylog.propagate = False
 
         self.rootlog = logging.getLogger('')
-        self.rootlog.setLevel(logging.WARNING)
+        self.rootlog.setLevel(logging.DEBUG)
         self.rootlog.addHandler(handler)
         self.rootlog.propagate = False
 
@@ -131,6 +131,12 @@ class MessageBaseWriter(threading.Thread):
         finally:
             avsc.close()
 
+    def have_pstmsg(self):
+        if self.second_pstmsg:
+            return self.second_pstmsg
+        else:
+            return []
+
     def _split_in_two(self, msg, fields):
         msglist = []
 
@@ -167,7 +173,7 @@ class MessageBaseWriter(threading.Thread):
 
         if ',' in fields['serviceType']:
             two_msgs = self._split_in_two(msg, fields)
-            self._second_pairedservtype_msg.append(two_msgs[1])
+            self.second_pstmsg.append(two_msgs[1])
             return two_msgs[0]
         else:
             return msg
@@ -221,21 +227,18 @@ class MessageBaseWriter(threading.Thread):
             except IndexError:
                 break
 
-        self._second_pairedservtype_msg = []
+        self.second_pstmsg = []
         self.valid = map(self.construct_msg, valid)
-        if self._second_pairedservtype_msg:
-            self.valid += self._second_pairedservtype_msg
+        self.valid += self.have_pstmsg()
 
         if self.log_out_allowedtime_msg:
-            self._second_pairedservtype_msg = []
+            self.second_pstmsg = []
             self.not_interval = map(self.construct_msg, not_interval)
-            if self._second_pairedservtype_msg:
-                self.not_interval += self._second_pairedservtype_msg
+            self.not_interval += self.have_pstmsg()
         if self.log_wrong_formatted_msg:
-            self._second_pairedservtype_msg = []
+            self.second_pstmsg = []
             self.not_valid = map(self.construct_msg, not_valid)
-            if self._second_pairedservtype_msg:
-                self.not_valid += self._second_pairedservtype_msg
+            self.not_valid += self.have_pstmsg()
 
 class MessageWriterIngestion(MessageBaseWriter):
     def load(self):
