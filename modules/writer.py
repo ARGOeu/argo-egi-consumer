@@ -24,29 +24,26 @@
 # Framework Programme (contract # INFSO-RI-261323)
 
 import avro.schema
+import datetime
 import json
 import logging
 import os
 import pprint
-import re
-import httplib
-import requests
 import stomp
 import sys
 import threading
 import time
+import re
 
 from argo_egi_consumer.shared import SingletonShared as Shared
 from avro.datafile import DataFileReader
 from avro.datafile import DataFileWriter
-from avro.io import BinaryEncoder
 from avro.io import DatumReader
 from avro.io import DatumWriter
-from base64 import b64encode
-from collections import deque
-from io import BytesIO
 from os import path
 
+defaultFileLogPastDays = 1
+defaultFileLogFutureDays = 1
 LOGFORMAT = '%(name)s[%(process)s]: %(levelname)s %(message)s'
 
 sh = Shared()
@@ -62,25 +59,18 @@ class MsgLogger:
         self.mylog.propagate = False
 
         self.rootlog = logging.getLogger('')
-        self.rootlog.setLevel(logging.DEBUG)
+        self.rootlog.setLevel(logging.WARNING)
         self.rootlog.addHandler(handler)
         self.rootlog.propagate = False
 
-    def _module_class_name(self, obj):
-        if isinstance(obj, str):
-            return obj
-        else:
-            name = repr(obj.__class__.__name__)
-            return name.replace("'",'')
+    def error(self, msg):
+        self.mylog.error(msg)
 
-    def error(self, obj, msg):
-        self.mylog.error(self._module_class_name(obj) + ': ' + str(msg))
+    def info(self, msg):
+        self.mylog.info(msg)
 
-    def info(self, obj, msg):
-        self.mylog.info(self._module_class_name(obj) + ': ' + str(msg))
-
-    def warning(self, obj, msg):
-        self.mylog.warning(self._module_class_name(obj) + ': ' + str(msg))
+    def warning(self, msg):
+        self.mylog.warning(msg)
 
     def addHandler(self, hdlr):
         self.mylog.addHandler(hdlr)
@@ -88,69 +78,36 @@ class MsgLogger:
     def removeHandler(self, hdlr):
         self.mylog.removeHandler(hdlr)
 
-class MessageBaseWriter(threading.Thread):
-    def __init__(self, queuelen):
-        threading.Thread.__init__(self)
-        self.name = self.__class__.__name__
-        sh.eventtermwrit.update({self.name: threading.Event()})
-        sh.cond.update({self.name: threading.Condition()})
-        sh.msgqueues.update({self.name: {'queue': deque(), 'size': queuelen}})
+
+class MessageWriter:
+    def __init__(self):
         self.load()
-
-    def refresh_qsize(self, confopt):
-        qsize = sh.ConsumerConf.get_option(confopt.lower(), optional=True)
-        qsize = 1 if not qsize else qsize
-        sh.msgqueues[self.name]['size'] = qsize
-
-    def run(self):
-        while True:
-            if sh.eventtermwrit[self.name].isSet():
-                break
-            sh.cond[self.name].acquire()
-            sh.cond[self.name].wait(0.2)
-            if len(sh.msgqueues[self.name]['queue']) == sh.msgqueues[self.name]['size']:
-                self.write_msg(sh.msgqueues[self.name]['queue'])
-                sh.cond[self.name].notify()
-                sh.cond[self.name].release()
 
     def load(self):
         sh.ConsumerConf.parse()
-        self.date_format = '%Y-%m-%dT%H:%M:%SZ'
-        self.futuredays_ok = sh.ConsumerConf.get_option('MsgRetentionFutureDaysOk'.lower())
-        self.log_out_allowedtime_msg = sh.ConsumerConf.get_option('MsgRetentionLogMsgOutAllowedTime'.lower())
-        self.log_wrong_formatted_msg = sh.ConsumerConf.get_option('GeneralLogWrongFormat'.lower())
-        self.pastdays_ok = sh.ConsumerConf.get_option('MsgRetentionPastDaysOk'.lower())
+        self.dateFormat = '%Y-%m-%dT%H:%M:%SZ'
+        self.fileDirectory = sh.ConsumerConf.get_option('OutputDirectory'.lower())
+        self.filenameTemplate = sh.ConsumerConf.get_option('OutputFilename'.lower())
+        self.errorFilenameTemplate = sh.ConsumerConf.get_option('OutputErrorFilename'.lower())
+        self.avroSchema = sh.ConsumerConf.get_option('GeneralAvroSchema'.lower())
+        self.txtOutput = sh.ConsumerConf.get_option('GeneralWritePlaintext'.lower())
+        self.pastDaysOk = sh.ConsumerConf.get_option('MsgRetentionPastDaysOk'.lower())
+        self.futureDaysOk = sh.ConsumerConf.get_option('MsgRetentionFutureDaysOk'.lower())
+        self.logOutAllowedTime = sh.ConsumerConf.get_option('GeneralLogMsgOutAllowedTime'.lower())
+        self.logWrongFormat = sh.ConsumerConf.get_option('GeneralLogWrongFormat'.lower())
 
+    def _write_to_ptxt(self, log, fields, exten):
         try:
-            avsc = open(sh.ConsumerConf.get_option('GeneralAvroSchema'.lower()))
-            self.schema = avro.schema.parse(avsc.read())
-        except (OSError, IOError) as e:
-            sh.Logger.error(self, e)
-            sh.Logger.removeHandler(handler)
+            filename = '.'.join(log.split('.')[:-1]) + '.%s' % exten
+            plainfile = open(filename, 'a+')
+            plainfile.write(json.dumps(fields) + '\n')
+            plainfile.close()
+        except (IOError, OSError) as e:
+            sh.Logger.error(e)
             raise SystemExit(1)
-        finally:
-            avsc.close()
 
-    def have_pstmsg(self):
-        if self.second_pstmsg:
-            return self.second_pstmsg
-        else:
-            return []
-
-    def _split_in_two(self, msg, fields):
+    def _write_to_avro(self, log, fields):
         msglist = []
-
-        servtype = fields['serviceType'].split(',')
-        msg['service'] = servtype[0].strip()
-        msglist.append(msg)
-
-        copymsg = msg.copy()
-        copymsg['service'] = servtype[1].strip()
-        msglist.append(copymsg)
-
-        return msglist
-
-    def construct_msg(self, fields):
         msg, tags = {}, {}
 
         msg = {'service': fields['serviceType'],
@@ -172,194 +129,90 @@ class MessageBaseWriter(threading.Thread):
             msg['tags'] = tags
 
         if ',' in fields['serviceType']:
-            two_msgs = self._split_in_two(msg, fields)
-            self.second_pstmsg.append(two_msgs[1])
-            return two_msgs[0]
+            servtype = fields['serviceType'].split(',')
+            msg['service'] = servtype[0].strip()
+            msglist.append(msg)
+            copymsg = msg.copy()
+            copymsg['service'] = servtype[1].strip()
+            msglist.append(copymsg)
         else:
-            return msg
+            msglist.append(msg)
 
-    def is_validmsg(self, msgfields):
+        sh.thlock.acquire(True)
+        try:
+            schema = avro.schema.parse(open(self.avroSchema).read())
+            if path.exists(log):
+                avroFile = open(log, 'a+')
+                writer = DataFileWriter(avroFile, DatumWriter())
+            else:
+                avroFile = open(log, 'w+')
+                writer = DataFileWriter(avroFile, DatumWriter(), schema)
+
+            for m in msglist:
+                writer.append(m)
+
+            writer.close()
+            avroFile.close()
+
+        except (IOError, OSError) as e:
+            sh.Logger.error(e)
+            raise SystemExit(1)
+
+        finally:
+            sh.thlock.release()
+
+    def _is_validmsg(self, msgfields):
         keys = set(msgfields.keys())
         mandatory_fields = set(['serviceType', 'timestamp', 'hostName', 'metricName', 'metricStatus'])
 
         if keys >= mandatory_fields:
             return True
         else:
-            sh.Logger.error(self, 'Message %s has no mandatory fields: %s' % (msgfields['message-id'],
-                                                                                  str([e for e in mandatory_fields.difference(keys)])))
+            sh.Logger.error('Message %s has no mandatory fields: %s' % (msgfields['message-id'],
+                                                                        str([e for e in mandatory_fields.difference(keys)])))
             return False
 
-    def is_ininterval(self, msgid, timestamp, now):
+    def _is_ininterval(self, msgid, timestamp, now):
         inint = False
 
         try:
-            import datetime
-            msgTime = datetime.datetime.strptime(timestamp, self.date_format).date()
+            msgTime = datetime.datetime.strptime(timestamp, self.dateFormat).date()
             nowTime = datetime.datetime.utcnow().date()
         except ValueError as e:
-            sh.Logger.error(self, 'Message %s %s' % (msgid, e))
+            sh.Logger.error('Message %s %s' % (msgid, e))
             return inint
 
         timeDiff = nowTime - msgTime
         if timeDiff.days == 0:
             inint = True
-        elif timeDiff.days > 0 and timeDiff.days <= self.pastdays_ok:
+        elif timeDiff.days > 0 and timeDiff.days <= self.pastDaysOk:
             inint = True
-        elif timeDiff.days < 0 and -timeDiff.days <= self.futuredays_ok:
+        elif timeDiff.days < 0 and -timeDiff.days <= self.futureDaysOk:
             inint = True
 
         return inint
 
-    def write_msg(self, msgs):
-        import datetime
+    def writeMessage(self, fields):
         now = datetime.datetime.utcnow().date()
-        valid, not_interval, not_valid = [], [], []
 
-        while True:
-            try:
-                msg = msgs.pop()
-                if self.log_wrong_formatted_msg and not self.is_validmsg(msg):
-                    not_valid.append(msg)
-                elif self.log_out_allowedtime_msg and not self.is_ininterval(msg['message-id'], msg['timestamp'], now):
-                    not_interval.append(msg)
-                elif self.is_validmsg(msg):
-                    valid.append(msg)
-            except IndexError:
-                break
+        if self._is_validmsg(fields):
+            if self._is_ininterval(fields['message-id'], fields['timestamp'], now):
+                filename = self.createLogFilename(fields['timestamp'][:10])
+                self._write_to_avro(filename, fields)
+                if self.txtOutput:
+                    self._write_to_ptxt(filename, fields, 'PLAINTEXT')
 
-        self.second_pstmsg = []
-        self.valid = map(self.construct_msg, valid)
-        self.valid += self.have_pstmsg()
+            elif self.logOutAllowedTime:
+                filename = self.createErrorLogFilename(str(now))
+                self._write_to_avro(filename, fields)
+                if self.txtOutput:
+                    self._write_to_ptxt(filename, fields, 'PLAINTEXT')
+        elif self.logWrongFormat:
+            filename = self.createErrorLogFilename(str(now))
+            self._write_to_ptxt(filename, fields, 'WRONGFORMAT')
 
-        if self.log_out_allowedtime_msg:
-            self.second_pstmsg = []
-            self.not_interval = map(self.construct_msg, not_interval)
-            self.not_interval += self.have_pstmsg()
-        if self.log_wrong_formatted_msg:
-            self.second_pstmsg = []
-            self.not_valid = map(self.construct_msg, not_valid)
-            self.not_valid += self.have_pstmsg()
+    def createLogFilename(self, timestamp):
+        return self.fileDirectory + self.filenameTemplate.replace('DATE', timestamp)
 
-class MessageWriterIngestion(MessageBaseWriter):
-    def load(self):
-        self.part_date_format = '%Y-%m-%d'
-        super(MessageWriterIngestion, self).load()
-        self.host = sh.ConsumerConf.get_option('MsgIngestionHost'.lower())
-        self.token = sh.ConsumerConf.get_option('MsgIngestionToken'.lower())
-        self.tenant = sh.ConsumerConf.get_option('MsgIngestionTenant'.lower())
-        self.urlapi = "/v1/projects/%s/topics/metric_data:publish?key=%s" % (self.tenant, self.token)
-        self.refresh_qsize('MsgIngestionBulkSize')
-
-    def _b64enc_msg(self, msg):
-        try:
-            avro_writer = DatumWriter(self.schema)
-            bytesio = BytesIO()
-            encoder = BinaryEncoder(bytesio)
-            avro_writer.write(msg, encoder)
-            raw_bytes = bytesio.getvalue()
-
-            return b64encode(raw_bytes)
-
-        except (IOError, OSError) as e:
-            sh.Logger.error(self, e)
-            raise SystemExit(1)
-
-    def _construct_ingest_msg(self, msgs):
-        def part_date(timestamp):
-            import datetime
-            d = datetime.datetime.strptime(timestamp, self.date_format)
-            return d.strftime(self.part_date_format)
-        msgs = map(lambda m: {"attributes": {"type": "metric_data",
-                                            "partition_date": part_date(m['timestamp'])},
-                            "data": self._b64enc_msg(m)}, msgs)
-        ingest_msg = {"messages": msgs}
-        return json.dumps(ingest_msg)
-
-    def write_msg(self, msgs):
-        super(MessageWriterIngestion, self).write_msg(msgs)
-
-        numsgs = len(self.valid)
-        self.valid = self._construct_ingest_msg(self.valid)
-
-        try:
-            response = requests.post('https://' + self.host + self.urlapi,
-                                     data=self.valid, verify=False)
-            response.raise_for_status()
-            sh.nummsging += numsgs
-        except requests.exceptions.RequestException as e:
-            if isinstance(e, requests.exceptions.HTTPError):
-                if e.response.status_code >= 400:
-                    # TODO: disable writer
-                    pass
-                sh.Logger.error(self, repr(e) + ' - ' + str(response.json()))
-            else:
-                sh.Logger.error(self, repr(e))
-
-class MessageWriterFile(MessageBaseWriter):
-    def load(self):
-        super(MessageWriterFile, self).load()
-        self.write_plaintxt = sh.ConsumerConf.get_option('MsgFileWritePlaintext'.lower())
-        self.errorfilename_template = sh.ConsumerConf.get_option('MsgFileErrorFilename'.lower())
-        self.filedir = sh.ConsumerConf.get_option('MsgFileDirectory'.lower())
-        self.filename_template = sh.ConsumerConf.get_option('MsgFileFilename'.lower())
-        self.refresh_qsize('MsgFileBulkSize')
-
-    def _write_to_ptxt(self, log, msg, exten):
-        try:
-            filename = '.'.join(log.split('.')[:-1]) + '.%s' % exten
-            plainfile = open(filename, 'a+')
-            plainfile.write(json.dumps(m) + '\n')
-            plainfile.close()
-        except (IOError, OSError) as e:
-            sh.Logger.error(self, e)
-            raise SystemExit(1)
-
-    def _write_to_avro(self, log, msg, count=False):
-        sh.thlock.acquire(True)
-        try:
-            if path.exists(log):
-                avroFile = open(log, 'a+')
-                writer = DataFileWriter(avroFile, DatumWriter())
-            else:
-                avroFile = open(log, 'w+')
-                writer = DataFileWriter(avroFile, DatumWriter(), self.schema)
-
-            writer.append(msg)
-            if count:
-                sh.nummsgfile += 1
-
-        except (IOError, OSError) as e:
-            sh.Logger.error(self, e)
-            raise SystemExit(1)
-
-        finally:
-            writer.close()
-            avroFile.close()
-            sh.thlock.release()
-
-    def _create_log_filename(self, timestamp):
-        return self.filedir + self.filename_template.replace('DATE', timestamp)
-
-    def _create_error_log_filename(self, timestamp):
-        return self.filedir + self.errorfilename_template.replace('DATE', timestamp)
-
-    def write_msg(self, msgs):
-        super(MessageWriterFile, self).write_msg(msgs)
-
-        for m in self.valid:
-            filename = self._create_log_filename(m['timestamp'][:10])
-            self._write_to_avro(filename, m, count=True)
-            if self.write_plaintxt:
-                self._write_to_ptxt(filename, m, 'PLAINTEXT')
-
-        if self.log_out_allowedtime_msg:
-            for m in self.not_interval:
-                filename = self._create_log_filename(m['timestamp'][:10])
-                self._write_to_avro(filename, m, count=True)
-                if self.write_plaintxt:
-                    self._write_to_ptxt(filename, m, 'PLAINTEXT')
-
-        if self.log_wrong_formatted_msg:
-            for m in self.not_valid:
-                filename = self._create_error_log_filename(str(now))
-                self._write_to_ptxt(filename, m, 'WRONGFORMAT')
+    def createErrorLogFilename(self, timestamp):
+        return self.fileDirectory + self.errorFilenameTemplate.replace('DATE', timestamp)

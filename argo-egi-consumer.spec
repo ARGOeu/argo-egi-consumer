@@ -1,7 +1,7 @@
 Name: argo-egi-consumer
 Summary: A/R Comp Engine message consumer
-Version: 2.0.0
-Release: 3%{?dist}
+Version: 1.4.5
+Release: 1%{?dist}
 License: ASL 2.0
 Buildroot: %{_tmppath}/%{name}-buildroot
 Group:     EGI/SA4
@@ -9,7 +9,6 @@ BuildArch: noarch
 Source0:   %{name}-%{version}.tar.gz
 Requires: stomppy >= 3.1.6, stomppy < 4
 Requires: avro
-Requires: python-requests
 Obsoletes: ar-consumer
 
 %description
@@ -52,17 +51,6 @@ if [ "$1" = 0 ] ; then
 fi
 
 %changelog
-* Mon Nov 7 2016 Daniel Vrcic <dvrcic@srce.hr> - 2.0.0-3%{?dist}
-- handle paired servtype msgs in base writer 
-* Mon Nov 7 2016 Daniel Vrcic <dvrcic@srce.hr> - 2.0.0-2%{?dist}
-- added needed dependancy
-* Wed Nov 2 2016 Daniel Vrcic <dvrcic@srce.hr> - 2.0.0-1%{?dist}
-- bump major version number because of introduced backward incompatible changes
-* Wed Sep 28 2016 Daniel Vrcic <dvrcic@srce.hr> - 1.4.6-1%{?dist} 
-- fixed shared class instantation
-- refactored message writer/sending code
-- introduced Ingestion API message sending
-- bulk sending/writing
 * Tue Sep 27 2016 Themis Zamani <themiszamani@gmail.com> - 1.4.5-1%{?dist}
 - New rpm package release
 * Sun Sep 25 2016 Themis Zamani <themiszamani@gmail.com> - 1.4.4-1%{?dist}
